@@ -5,8 +5,17 @@ import { LANGUAGE_LABELS, SITUATION_LABELS } from '../domain/labels';
 import { currentVersion } from '../domain/session';
 import { countChars } from '../domain/text';
 import { structureApplyMessage } from '../domain/structure';
-import type { ChangeType, PartialExplanation, ResultVersion, ReviewSession, StructureReview } from '../domain/types';
+import type {
+  ChangeType,
+  MistakeCard,
+  PartialExplanation,
+  Rating,
+  ResultVersion,
+  ReviewSession,
+  StructureReview,
+} from '../domain/types';
 import { ChatSection } from './ChatSection';
+import { QuizCard } from './QuizCard';
 import type { ChatState, DownloadState, ExplainState } from './controller';
 
 interface Props {
@@ -25,6 +34,9 @@ interface Props {
   chatState: ChatState | null;
   onSendChat: (text: string) => void;
   onRetryChat: () => void;
+  /** この実行の待ち時間に出す復習クイズ */
+  quizCard: MistakeCard | null;
+  onRateCard: (cardId: string, rating: Rating) => void;
 }
 
 export function ReviewView({
@@ -41,10 +53,14 @@ export function ReviewView({
   chatState,
   onSendChat,
   onRetryChat,
+  quizCard,
+  onRateCard,
 }: Props) {
   const version = currentVersion(session);
   // 生成中は途中の改稿文を、前の案の代わりに表示する
   const streaming = session.status.kind === 'running' && partialText !== null;
+  // 改稿文が届き始めるまでが待ち時間
+  const waiting = session.status.kind === 'running' && partialText === null && !version;
   return (
     <>
       <section className="section">
@@ -59,6 +75,10 @@ export function ReviewView({
       </section>
 
       <StatusPanel session={session} download={download} onRetry={onRetry} onDownload={onDownload} />
+
+      {quizCard && (
+        <WaitingQuiz key={quizCard.id} card={quizCard} waiting={waiting} onRate={(r) => onRateCard(quizCard.id, r)} />
+      )}
 
       {streaming && (
         <section className="section">
@@ -106,6 +126,23 @@ export function ReviewView({
 
       <CopyButton className="link debug-copy" label="デバッグ用にJSONをコピー" getText={debugJson} />
     </>
+  );
+}
+
+/** 待ち時間の復習クイズ。改稿文が届き始めたら1行にたたみ、結果を読めるようにする */
+function WaitingQuiz({ card, waiting, onRate }: { card: MistakeCard; waiting: boolean; onRate: (r: Rating) => void }) {
+  const [open, setOpen] = useState(waiting);
+  useEffect(() => {
+    if (!waiting) setOpen(false);
+  }, [waiting]);
+  return (
+    <details className="section quiz-panel" open={open} onToggle={(e) => setOpen(e.currentTarget.open)}>
+      <summary>
+        <h2>待ち時間に復習</h2>
+        {!open && <span className="meta"> {card.before}</span>}
+      </summary>
+      <QuizCard card={card} onRate={onRate} />
+    </details>
   );
 }
 

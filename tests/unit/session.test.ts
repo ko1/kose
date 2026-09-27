@@ -4,6 +4,7 @@ import {
   createSession,
   currentVersion,
   displayedTabAfterActivation,
+  SCRATCH_TAB_ID,
   markInterrupted,
   selectVersion,
   setExplanation,
@@ -57,7 +58,7 @@ describe('session', () => {
     ]);
     expect(displayedTabAfterActivation(sessions, 2, 1)).toBe(1);
     expect(displayedTabAfterActivation(sessions, 1, 3)).toBe(1);
-    expect(displayedTabAfterActivation(sessions, null, 3)).toBeNull();
+    expect(displayedTabAfterActivation(sessions, SCRATCH_TAB_ID, 3)).toBe(SCRATCH_TAB_ID);
   });
 
   it('実行中のセッションだけを中断扱いにする', () => {

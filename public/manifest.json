@@ -12,7 +12,13 @@
     "type": "module"
   },
   "action": {
-    "default_title": "koseウィンドウを開く"
+    "default_title": "kose"
+  },
+  "commands": {
+    "run-kose": {
+      "suggested_key": { "default": "Alt+K" },
+      "description": "選択した文章を、最後に選んだ仕上がりで kose にかける"
+    }
   },
   "options_page": "options.html",
   "icons": {

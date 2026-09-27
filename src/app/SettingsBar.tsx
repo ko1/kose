@@ -2,7 +2,8 @@ import { LANGUAGE_LABELS, SITUATION_LABELS } from '../domain/labels';
 import { LANGUAGE_CODES, LanguageCode, Situation, SITUATIONS } from '../domain/types';
 import type { Settings } from '../storage/settings';
 
-export function SettingsFooter({
+/** 機能（よい日本語／よい英語にする）・用途。次回の実行にも使うので、ウィンドウの一番上に置く */
+export function SettingsBar({
   settings,
   canRegenerate,
   onChange,
@@ -14,9 +15,9 @@ export function SettingsFooter({
   onRegenerate: () => void;
 }) {
   return (
-    <footer className="footer">
+    <div className="settings-bar">
       <div className="field">
-        <label htmlFor="target">仕上がり</label>
+        <label htmlFor="target">機能</label>
         <select
           id="target"
           value={settings.targetLanguage}
@@ -24,7 +25,7 @@ export function SettingsFooter({
         >
           {LANGUAGE_CODES.map((code) => (
             <option key={code} value={code}>
-              {LANGUAGE_LABELS[code].target}
+              {LANGUAGE_LABELS[code].target}にする
             </option>
           ))}
         </select>
@@ -43,9 +44,21 @@ export function SettingsFooter({
           ))}
         </select>
       </div>
-      <button className="primary" disabled={!canRegenerate} onClick={onRegenerate}>
-        この設定で再生成
+      <button
+        className="primary"
+        disabled={!canRegenerate}
+        onClick={onRegenerate}
+        title="表示中の案と機能・用途が違うときに、同じ原文から作り直します"
+      >
+        変更
       </button>
+    </div>
+  );
+}
+
+export function ProviderFooter({ settings }: { settings: Settings }) {
+  return (
+    <footer className="footer">
       <div className="provider">
         {settings.provider === 'openai' ? (
           <span className="external">外部送信: OpenAI（{settings.openaiModel}）</span>

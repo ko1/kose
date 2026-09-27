@@ -6,13 +6,27 @@ import {
   createSession,
   displayedTabAfterActivation,
   markInterrupted,
+  SCRATCH_SOURCE,
+  SCRATCH_TAB_ID,
   selectVersion,
   setExplanation,
 } from '../domain/session';
-import type { PartialExplanation, PendingRequest, ReviewSession, SessionStatus } from '../domain/types';
+import { dueCards, extractMistakes } from '../domain/mistakes';
+import type { MistakeCard, PartialExplanation, PendingRequest, Rating, ReviewSession, SessionStatus } from '../domain/types';
 import { needsStructureReview } from '../domain/structure';
+import { trimSelection } from '../domain/text';
 import { newId } from '../shared/ids';
-import { isPendingKey, loadAll, saveSession, takePending } from '../storage/sessionStore';
+import { loadMistakes, onMistakesChanged, rateMistake, saveMistakes } from '../storage/mistakeStore';
+import {
+  isPendingKey,
+  loadAll,
+  loadScratchDraft,
+  saveScratchDraft,
+  saveSession,
+  SCRATCH_REQUEST_KEY,
+  takePending,
+  takeScratchRequest,
+} from '../storage/sessionStore';
 import { loadSettings, onSettingsChanged, saveSettings, Settings } from '../storage/settings';
 
 export interface DownloadState {
@@ -38,7 +52,12 @@ export interface ControllerSnapshot {
   settings: Settings;
   /** 新しい順 */
   sessions: ReviewSession[];
+  /** 表示中のタブID。自由入力なら SCRATCH_TAB_ID */
+  displayedTabId: number;
+  /** 表示中のセッション。自由入力でまだ実行していなければ null */
   displayed: ReviewSession | null;
+  /** 自由入力の下書きと、入力欄にフォーカスする合図（増えたらフォーカス） */
+  scratch: { draft: string; focusSeq: number };
   /** Chrome内蔵モデルのダウンロード状況。ダウンロード中でなければ null */
   download: DownloadState | null;
   /** 表示中セッションの生成途中の改稿文。生成中でなければ null */
@@ -47,6 +66,10 @@ export interface ControllerSnapshot {
   explainStates: Readonly<Record<string, ExplainState>>;
   /** 表示中セッションの相談の状況。何もしていなければ null */
   chatState: ChatState | null;
+  /** 表示中セッションの実行時に出した復習クイズのカード。なければ null */
+  quizCard: MistakeCard | null;
+  /** 今出題できるカード（期限の早い順） */
+  dueCards: MistakeCard[];
 }
 
 /**
@@ -57,7 +80,12 @@ export class KoseController {
   private settings!: Settings;
   private readonly sessions = new Map<number, ReviewSession>();
   private readonly aborts = new Map<number, AbortController>();
-  private displayedTabId: number | null = null;
+  /** セッションがなければ自由入力を表示する */
+  private displayedTabId: number = SCRATCH_TAB_ID;
+  private scratchDraft = '';
+  private scratchFocusSeq = 0;
+  /** 初期化が済んだか。済む前に届いた自由入力の合図は init でまとめて取り出す */
+  private initialized = false;
   private ownWindowId: number | undefined;
   private download: DownloadState | null = null;
   /** 生成途中の改稿文（タブ単位）。頻繁に変わるので storage には保存しない */
@@ -66,6 +94,11 @@ export class KoseController {
   private readonly explainAborts = new Map<string, AbortController>();
   private readonly chatStates = new Map<number, ChatState>();
   private readonly chatAborts = new Map<number, AbortController>();
+  private cards: MistakeCard[] = [];
+  /** タブごとに、実行を待つ間に出したクイズのカードID（実行ごとに最大1枚） */
+  private readonly quizzes = new Map<number, string>();
+  /** 期限が来たカードを画面に反映するための定期確認 */
+  private dueTimer: ReturnType<typeof setInterval> | undefined;
   private snapshot: ControllerSnapshot | null = null;
   private readonly listeners = new Set<() => void>();
   private readonly disposers: (() => void)[] = [];
@@ -74,6 +107,8 @@ export class KoseController {
 
   async init(): Promise<void> {
     this.settings = await loadSettings();
+    this.cards = await loadMistakes();
+    this.scratchDraft = await loadScratchDraft();
     this.ownWindowId = (await chrome.windows.getCurrent()).id;
     // 読み込み中に届いた要求を取りこぼさないよう、先に購読する（重複は acceptPending が除く）
     this.listen();
@@ -87,11 +122,16 @@ export class KoseController {
     }
     const [active] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
     if (active?.id !== undefined && this.sessions.has(active.id)) this.displayedTabId = active.id;
-    else this.displayedTabId ??= this.newestSession()?.source.tabId ?? null;
+    else this.displayedTabId = this.newestSession()?.source.tabId ?? SCRATCH_TAB_ID;
+    this.initialized = true;
+    // 初期化中に届いた合図も含めてここで取り出す
+    const scratchAt = await takeScratchRequest();
     this.emit();
 
     // AIの完了は待たない（初期化を塞がない）
     for (const req of pending.sort((a, b) => a.createdAt - b.createdAt)) void this.acceptPending(req);
+    // 選択なしで実行されてウィンドウが開いた場合は自由入力を出す（ページからの実行より新しければ）
+    if (scratchAt !== undefined && pending.every((req) => req.createdAt <= scratchAt)) this.showScratch();
     this.prewarm();
   }
 
@@ -114,6 +154,7 @@ export class KoseController {
     for (const a of this.aborts.values()) a.abort();
     for (const a of this.explainAborts.values()) a.abort();
     for (const a of this.chatAborts.values()) a.abort();
+    clearInterval(this.dueTimer);
   }
 
   // ---- React (useSyncExternalStore) 向け ----
@@ -140,6 +181,7 @@ export class KoseController {
     this.abortExplains(existing);
     this.abortChat(tabId);
     this.sessions.set(tabId, createSession(req, this.settings.situation));
+    this.assignQuiz(tabId);
     this.displayedTabId = tabId;
     this.emit();
     await takePending(tabId, req.requestId);
@@ -164,17 +206,45 @@ export class KoseController {
     this.partials.delete(tabId);
     this.abortExplains(this.sessions.get(tabId));
     this.abortChat(tabId);
+    this.quizzes.delete(tabId);
     if (!this.sessions.delete(tabId)) return;
-    if (this.displayedTabId === tabId) this.displayedTabId = this.newestSession()?.source.tabId ?? null;
+    if (this.displayedTabId === tabId) this.displayedTabId = this.newestSession()?.source.tabId ?? SCRATCH_TAB_ID;
     this.emit();
   }
 
   // ---- UI操作 ----
 
   showSession(tabId: number): void {
+    if (tabId === SCRATCH_TAB_ID) return this.showScratch();
     if (!this.sessions.has(tabId)) return;
     this.displayedTabId = tabId;
     this.emit();
+  }
+
+  /** 自由入力を表示し、入力欄にフォーカスさせる */
+  showScratch(): void {
+    this.displayedTabId = SCRATCH_TAB_ID;
+    this.scratchFocusSeq++;
+    this.emit();
+  }
+
+  setScratchDraft(draft: string): void {
+    this.scratchDraft = draft;
+    this.emit();
+    void saveScratchDraft(draft);
+  }
+
+  /** 自由入力の下書きを、選択範囲と同じように kose にかける。下書きは残す */
+  async runScratch(): Promise<void> {
+    const text = trimSelection(this.scratchDraft);
+    if (text === '') return;
+    await this.acceptPending({
+      requestId: newId(),
+      targetLanguage: this.settings.targetLanguage,
+      text,
+      source: SCRATCH_SOURCE,
+      createdAt: Date.now(),
+    });
   }
 
   async updateSettings(patch: Partial<Settings>): Promise<void> {
@@ -183,7 +253,7 @@ export class KoseController {
     if (patch.targetLanguage || patch.provider) this.prewarm();
   }
 
-  /** 下部の設定で同じ原文を再生成する */
+  /** 上部の設定で同じ原文を再生成する */
   async regenerate(tabId: number): Promise<void> {
     const session = this.sessions.get(tabId);
     if (!session) return;
@@ -276,10 +346,13 @@ export class KoseController {
       const latest = this.sessions.get(tabId);
       if (abort.signal.aborted || latest?.id !== session.id) return;
       this.explainStates.delete(version.id);
-      this.update(
-        tabId,
-        setExplanation(latest, version.id, { ...explanation, provider: provider.id, durationMs: Date.now() - startedAt }),
-      );
+      const next = setExplanation(latest, version.id, {
+        ...explanation,
+        provider: provider.id,
+        durationMs: Date.now() - startedAt,
+      });
+      this.update(tabId, next);
+      await this.recordMistakes(next, version.id);
     } catch (e) {
       if (abort.signal.aborted) return;
       this.explainStates.set(version.id, { kind: 'error', message: errorMessage(e) });
@@ -305,7 +378,32 @@ export class KoseController {
     await this.runChat(tabId);
   }
 
+  /** 復習クイズの自己評価を記録する */
+  async rateCard(cardId: string, rating: Rating): Promise<void> {
+    this.cards = await rateMistake(cardId, rating, Date.now());
+    this.emit();
+  }
+
   // ---- 内部 ----
+
+  /** 新しい実行の待ち時間に出すカードを1枚選ぶ。他のタブで出しているカードは避ける */
+  private assignQuiz(tabId: number): void {
+    this.quizzes.delete(tabId);
+    if (!this.settings.quizWhileWaiting) return;
+    const shown = new Set(this.quizzes.values());
+    const card = dueCards(this.cards, Date.now()).find((c) => !shown.has(c.id));
+    if (card) this.quizzes.set(tabId, card.id);
+  }
+
+  /** 右クリック直後の案の解説から、客観的な誤りを記録する（spec §2） */
+  private async recordMistakes(session: ReviewSession, versionId: string): Promise<void> {
+    const version = session.versions.find((v) => v.id === versionId);
+    if (!this.settings.autoSaveMistakes || !version) return;
+    const candidates = extractMistakes(session, version);
+    if (candidates.length === 0) return;
+    this.cards = await saveMistakes(candidates, Date.now());
+    this.emit();
+  }
 
   private async runChat(tabId: number): Promise<void> {
     const session = this.sessions.get(tabId);
@@ -462,6 +560,10 @@ export class KoseController {
       if (area !== 'session') return;
       for (const [key, change] of Object.entries(changes)) {
         if (isPendingKey(key) && change.newValue) void this.acceptPending(change.newValue as PendingRequest);
+        // 初期化中の合図は init の最後にまとめて処理する
+        if (key === SCRATCH_REQUEST_KEY && change.newValue !== undefined && this.initialized) {
+          void takeScratchRequest().then((at) => at !== undefined && this.showScratch());
+        }
       }
     };
     chrome.storage.onChanged.addListener(onStorage);
@@ -476,6 +578,15 @@ export class KoseController {
     this.disposers.push(() => chrome.tabs.onRemoved.removeListener(onRemoved));
 
     this.disposers.push(
+      onMistakesChanged((cards) => {
+        this.cards = cards;
+        this.emit();
+      }),
+    );
+    // 期限は時間とともに来るので、出題できる件数を定期的に更新する
+    this.dueTimer = setInterval(() => this.emit(), 60_000);
+
+    this.disposers.push(
       onSettingsChanged((settings) => {
         this.settings = settings;
         this.emit();
@@ -487,11 +598,15 @@ export class KoseController {
     this.snapshot = {
       settings: this.settings,
       sessions: this.sortedSessions(),
-      displayed: this.displayedTabId === null ? null : (this.sessions.get(this.displayedTabId) ?? null),
+      displayedTabId: this.displayedTabId,
+      displayed: this.sessions.get(this.displayedTabId) ?? null,
+      scratch: { draft: this.scratchDraft, focusSeq: this.scratchFocusSeq },
       download: this.download,
-      partialText: this.displayedTabId === null ? null : (this.partials.get(this.displayedTabId) ?? null),
+      partialText: this.partials.get(this.displayedTabId) ?? null,
       explainStates: Object.fromEntries(this.explainStates),
-      chatState: this.displayedTabId === null ? null : (this.chatStates.get(this.displayedTabId) ?? null),
+      chatState: this.chatStates.get(this.displayedTabId) ?? null,
+      quizCard: this.cards.find((c) => c.id === this.quizzes.get(this.displayedTabId)) ?? null,
+      dueCards: dueCards(this.cards, Date.now()),
     };
     for (const l of this.listeners) l();
   }

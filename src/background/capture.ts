@@ -4,7 +4,7 @@ export interface CapturedSelection {
 }
 
 /**
- * 右クリックされたフレームに注入して選択文字列を改行付きで取得する。
+ * 対象フレームに注入して選択文字列を改行付きで取得する。
  * executeScript で直列化されるため、この関数は外部の変数・importを参照してはならない。
  */
 export function captureSelection(): CapturedSelection | null {

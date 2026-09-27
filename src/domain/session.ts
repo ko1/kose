@@ -8,10 +8,22 @@ import type {
   ReviewSession,
   RewriteResult,
   Situation,
+  SourceLocation,
   VersionOrigin,
 } from './types';
 import { newId } from '../shared/ids';
 import { detectLanguage } from './language';
+
+/** 自由入力のセッションを置く特別なタブID（実在のタブIDは 0 以上） */
+export const SCRATCH_TAB_ID = -1;
+
+export const SCRATCH_SOURCE: SourceLocation = {
+  tabId: SCRATCH_TAB_ID,
+  frameId: 0,
+  tabTitle: '自由入力',
+  textSource: 'script',
+  editable: false,
+};
 
 export function createSession(req: PendingRequest, situation: Situation): ReviewSession {
   return {
@@ -76,9 +88,9 @@ export function currentVersion(session: ReviewSession): ResultVersion | undefine
  */
 export function displayedTabAfterActivation(
   sessions: ReadonlyMap<number, ReviewSession>,
-  currentDisplayed: number | null,
+  currentDisplayed: number,
   activatedTabId: number,
-): number | null {
+): number {
   return sessions.has(activatedTabId) ? activatedTabId : currentDisplayed;
 }
 

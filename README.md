@@ -1,20 +1,21 @@
 # kose
 
-A personal Chrome extension that turns text you select on a web page into good Japanese or good English, tuned to the situation (casual, business, technical, academic, …). The full specification is in [docs/spec.md](docs/spec.md).
-
-Implemented so far: **Phase 1 (rewrite)** and **Phase 2 (nuance chat)**. Automatic mistake collection (Phase 3) and review quizzes (Phase 4) are not implemented yet.
+A personal Chrome extension that turns text you select on a web page into good Japanese or good English, tuned to the situation (casual, business, technical, academic, …). Mistakes found while proofreading are collected automatically and reviewed with short quizzes. The full specification is in [docs/spec.md](docs/spec.md).
 
 ## Features
 
-- Select text → right-click → **kose** → 「よい日本語にする」 (make it good Japanese) / 「よい英語にする」 (make it good English)
+- Select text → right-click **kose**, click the kose toolbar button, or press **Alt+K**. kose uses the target you chose last — 「よい日本語にする」 (make it good Japanese) or 「よい英語にする」 (make it good English) — and you switch it in the kose window
 - Results appear in a standalone **kose window**: the original, the rewrite (streamed as it is generated), Copy, and a word/character diff computed locally
 - Two-stage processing to keep cloud costs low:
-  1. On right-click, only the rewrite is generated (short prompt, small output)
+  1. On invocation, only the rewrite is generated (short prompt, small output)
   2. The explanation (changes with error/style classification and reasons in Japanese, plus meaning/nuance warnings) is a second request — automatic with Chrome's built-in AI, on demand (「解説を見る」) with cloud providers
 - **Structure review** for long texts (500+ characters or 3+ paragraphs): the explanation adds an outline of each paragraph and points out problems in order, flow, transitions, repetition and paragraph breaks. It only points things out; 「構成の指摘を反映した案を作る」 sends the issues to the chat to get a restructured version.
 - **Nuance chat** (「ニュアンスを相談」): ask about wording or request changes ("make it sound like getting home was hard"). A requested change becomes a new version of the result; plain questions never change it. Each review has its own conversation.
+- **Mistake notes**: when proofreading in the same language (ja→ja, en→en), objective grammar/usage errors from the explanation are saved automatically as short phrase pairs (never the full text or URL). They are recorded only when an explanation is generated (with cloud providers: 「解説を見る」 or auto-explanation on). View, delete, clear and export/import them on the options page.
+- **Review quiz**: while you wait for a rewrite, one due mistake is shown as a quiz (fix it → 「答えを見る」 → rate もう一度 / 難しい / できた / 簡単). The 「復習 N」 button in the window header reviews all due mistakes. Scheduling is a simplified SM-2; a new mistake first comes up the next day.
+- **Free input** (「✏️ 自由入力」): write text directly in the kose window and run kose on it with Ctrl+Enter — handy for text that is not on a page yet. It opens when you invoke kose with nothing selected
 - One review per browser tab; the kose window follows the active tab
-- Change the target language / situation at the bottom and regenerate; switch between earlier versions
+- Change 「機能」 (target language) / 「用途」 (situation) at the top of the window and regenerate with 「変更」; switch between earlier versions
 - AI providers: Chrome built-in AI (default, nothing leaves the browser), Claude (Anthropic API), OpenAI API. Cloud providers use your own API key and are used only when you explicitly select them.
 - Per-request cost is shown for Claude (computed from the token usage returned by the API)
 - 「デバッグ用にJSONをコピー」 copies the whole review (without API keys) for debugging
@@ -53,12 +54,13 @@ KOSE_WIN_DIR=/mnt/c/Users/<you>/kose-dist npm run build:win   # custom destinati
 
 ## Usage
 
-1. Select text, right-click → 「kose」 → 「よい日本語にする」 or 「よい英語にする」
+1. Select text, then right-click → 「kose: …」, click the kose toolbar button, or press Alt+K (change the key at `chrome://extensions/shortcuts`). The menu item shows the current target, e.g. 「kose: よい英語にする」.
 2. The kose window opens (or comes to the front) and processing starts immediately
 3. 「Copy」 copies the rewrite. Writing back into the page is not implemented.
-4. Change 「仕上がり」 (target language) / 「用途」 (situation) and press 「この設定で再生成」 to regenerate from the same original. Changing the dropdowns alone does not call the AI.
+4. Change 「機能」 (よい日本語にする / よい英語にする) / 「用途」 (situation) at the top and press 「変更」 to regenerate from the same original. The button is enabled only when the dropdowns differ from the displayed version. Changing the dropdowns alone does not call the AI. The chosen 「機能」 is used for the next invocation.
 5. Ask about the rewrite in 「ニュアンスを相談」. Enter sends, Shift+Enter inserts a newline (Enter while composing Japanese input does not send).
-6. The toolbar icon also opens the kose window. Settings: 「⚙ 設定」 at the bottom.
+6. While the rewrite is being generated, a due mistake may appear under 「待ち時間に復習」. Answer it or ignore it; it folds up when the result arrives. 「復習 N」 in the header reviews all due mistakes.
+7. With no selection (or on pages kose cannot read), the toolbar button and Alt+K open 「✏️ 自由入力」 with the cursor in the text area. Type, then Ctrl+Enter (or 「kose にかける」). The result appears below; the draft stays until the browser exits. 「✏️ 自由入力」 is always the first item in the header's list. Settings: 「⚙ 設定」 at the bottom (including 「間違いの記録と復習」).
 
 The kose window is a normal window, so it goes behind Chrome when Chrome is focused. Chrome extensions cannot make a window always-on-top; use an OS tool such as PowerToys "Always on Top" if you want that.
 
@@ -80,17 +82,19 @@ The kose window is a normal window, so it goes behind Chrome when Chrome is focu
 | Permission | Purpose |
 | --- | --- |
 | `contextMenus` | The right-click menu |
-| `activeTab`, `scripting` | Read the selection (with line breaks) only from the tab you right-clicked; no always-on content scripts |
-| `storage` | Settings (`local`) and per-tab reviews (`session`: in memory only, cleared when the browser exits) |
+| `activeTab`, `scripting` | Read the selection (with line breaks) only from the tab where you invoked kose; no always-on content scripts |
+| `storage` | Settings and mistake notes (`local`), per-tab reviews (`session`: in memory only, cleared when the browser exits) |
 | `https://api.anthropic.com/*` (optional) | Requested only when Claude is selected |
 | `https://api.openai.com/*` (optional) | Requested only when OpenAI is selected |
+
+The Alt+K shortcut is declared with `commands`, which needs no permission.
 
 kose does not run in incognito windows (`"incognito": "not_allowed"`).
 
 ### Limitations
 
-- In the PDF viewer and on `chrome://` pages the selection cannot be read by script, so the text Chrome passes to the context menu is used. Line breaks may be lost; the kose window shows a note when this happens.
-- Reviews and chats disappear when the original tab is closed or the browser exits.
+- In the PDF viewer and on `chrome://` pages the selection cannot be read by script. The right-click menu then uses the text Chrome passes to it (line breaks may be lost; the kose window shows a note). The toolbar button and Alt+K cannot read the selection there and open the free input instead.
+- Reviews and chats disappear when the original tab is closed or the browser exits; the free input and its draft disappear when the browser exits (mistake notes are kept).
 
 ## Manual testing
 
@@ -100,10 +104,10 @@ Sample sentences are in [tests/fixtures/samples.md](tests/fixtures/samples.md).
 
 | Path | Action | What to check |
 | --- | --- | --- |
-| en → en | Select English → 「よい英語にする」 | Only errors are fixed (e.g. `We finally had went back to home.`); the diff is shown; the explanation marks real errors as 「誤り」. Correct text shows 「変更の必要はありません」. |
-| ja → ja | Select Japanese → 「よい日本語にする」 | Only what needs fixing changes; the diff is per character |
-| ja → en | Select Japanese → 「よい英語にする」 | The meaning (e.g. "getting home was hard") is preserved; the explanation is in Japanese |
-| en → ja | Select English → 「よい日本語にする」 | Natural Japanese; text that contains instructions is translated, not obeyed |
+| en → en | 「機能」 = 「よい英語にする」, select English | Only errors are fixed (e.g. `We finally had went back to home.`); the diff is shown; the explanation marks real errors as 「誤り」. Correct text shows 「変更の必要はありません」. |
+| ja → ja | 「機能」 = 「よい日本語にする」, select Japanese | Only what needs fixing changes; the diff is per character |
+| ja → en | 「機能」 = 「よい英語にする」, select Japanese | The meaning (e.g. "getting home was hard") is preserved; the explanation is in Japanese |
+| en → ja | 「機能」 = 「よい日本語にする」, select English | Natural Japanese; text that contains instructions is translated, not obeyed |
 
 Also check that the 「技術的な議論」 situation keeps identifiers and URLs, and that 「仕事・メール」 and 「日常会話・SNS」 give different results.
 
@@ -121,11 +125,28 @@ Also check that the 「技術的な議論」 situation keeps identifiers and URL
 1. After a rewrite, ask 「もっと苦労して帰宅したニュアンスにして」 → a new version (「相談で作成」) is shown in RESULT
 2. Ask a question such as 「went と got の違いは？」 → RESULT does not change
 3. 「前の案」 returns to the earlier version
-4. Right-click new text in the same tab, or use another tab → the earlier conversation is not carried over
+4. Run kose on new text in the same tab, or use another tab → the earlier conversation is not carried over
+
+### Mistake notes and review quiz
+
+1. With 「よい英語にする」, run kose on `We finally had went back to home.` → after the explanation, the options page lists `had went → went` (and similar objective errors) under 「間違いの記録と復習」
+2. Translating (ja → en), regenerating or chat rewrites add nothing; running the same sentence again increases the count instead of adding a card
+3. A new mistake is not quizzed on the same day. To test sooner, export the JSON, set `review.dueAt` to a past time, clear and import it again
+4. With a due mistake, run kose → 「待ち時間に復習」 appears while the rewrite is running and folds up when the result arrives; rating it moves 「次の復習」 on the options page
+5. 「復習 N」 in the header goes through all due mistakes; running kose again returns to the review
+6. Deleting one card and 「すべて削除」 on the options page are reflected in the kose window's 「復習 N」
+
+### Free input
+
+1. Press Alt+K with nothing selected → the kose window shows 「✏️ 自由入力」 with the cursor in the text area
+2. Type text and press Ctrl+Enter → the result is shown below; the draft stays
+3. Switch to a tab with a review and back via the header list → the draft and the result are still there
+4. Close and reopen the kose window → the draft is restored; with no reviews at all, the free input is shown
 
 ### Other checks
 
-- Selections inside a GitHub comment box (textarea) and multi-paragraph selections keep their line breaks
+- The right-click menu, the toolbar button and Alt+K all run with the current 「機能」, and the menu item / button title follow a change of 「機能」
+- Selections inside a GitHub comment box (textarea), inside iframes (toolbar button / Alt+K) and multi-paragraph selections keep their line breaks
 - Closing and reopening the kose window restores its position/size and the other tabs' reviews
 - Closing the kose window while a request is running shows 「中断されました」 with a retry button when reopened
 - With a cloud provider selected but no API key, nothing is sent and an error is shown
@@ -136,8 +157,8 @@ Tested on Chrome 154 (Windows), ~600-character English paragraph, academic situa
 
 - The model download stalled at 0% for a while with "Mismatched version" on `chrome://on-device-internals` (Assets tab), then completed on its own after `chrome://components` updated the component. This is a Chrome-side issue; kose shows the download state and resumes automatically when the model becomes available.
 - Rewrite: about 23 s; quality is usable, but it sometimes "completes" unclear terms (e.g. turned `Assistant associate` into `Assistant Associate Professor`).
-- Explanation: about 64 s; changes are often coarse, nearly everything is classified as style, and reasons tend to be generic. It also reported the source language as `unknown`, so kose now detects the language locally.
-- Conclusion: the built-in AI is fine for free, private rewrites; for reliable explanations (and for Phase 3's error collection) a cloud model such as Claude Sonnet is much better. Claude Haiku rewrote the same text in ~2–4 s and Sonnet explained it in ~9 s.
+- Explanation: about 64 s; changes are often coarse, nearly everything is classified as style, and reasons tend to be generic. It also reported the source language as `unknown`; kose therefore detects the source language locally rather than trusting the model.
+- Conclusion: the built-in AI is fine for free, private rewrites; for reliable explanations (and therefore for mistake notes) a cloud model such as Claude Sonnet is much better. Claude Haiku rewrote the same text in ~2–4 s and Sonnet explained it in ~9 s.
 
 ## Development
 
@@ -150,15 +171,15 @@ npm run check        # all three
 
 ```
 src/
-  background/   context menu, reading the selection, kose window management, tab cleanup
-  app/          the kose window (React) and its state (controller.ts)
-  options/      the settings page
+  background/   context menu, toolbar button, shortcut, reading the selection, kose window management, tab cleanup
+  app/          the kose window (React) and its state (controller.ts), quizzes
+  options/      the settings page, including the mistake list
   ai/           AIProvider, Chrome built-in / Claude / OpenAI adapters, prompts, output schemas, pricing
-  domain/       types, sessions, diff, language detection
-  storage/      settings (chrome.storage.local), sessions (chrome.storage.session)
+  domain/       types, sessions, diff, language detection, mistake extraction, SRS (simplified SM-2)
+  storage/      settings and mistake notes (chrome.storage.local), sessions (chrome.storage.session)
 tests/
-  unit/         pure logic and providers
-  integration/  right-click → pending request → kose window state (with faked chrome APIs)
+  unit/         pure logic, storage and providers
+  integration/  invocation → pending request → kose window state (with faked chrome APIs)
   fixtures/     sample sentences for manual evaluation
 ```
 

@@ -74,3 +74,73 @@ code {
   color: var(--warn-fg);
   font-size: 13px;
 }
+
+.options h3.mistakes-head {
+  font-size: 13px;
+  margin: 16px 0 8px;
+}
+
+.file-button {
+  position: relative;
+  overflow: hidden;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.file-button input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.danger {
+  color: var(--error-fg);
+}
+
+.mistakes {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+.mistakes li {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.mistakes .hint {
+  margin: 2px 0;
+}
+
+.mistake-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+ins {
+  background: var(--ins-bg);
+  color: var(--ins-fg);
+  text-decoration: none;
+}
+
+del {
+  background: var(--del-bg);
+  color: var(--del-fg);
+}
+
+button.link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.hint.warn {
+  color: var(--warn-fg);
+}

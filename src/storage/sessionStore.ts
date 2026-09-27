@@ -6,6 +6,10 @@ import type { PendingRequest, ReviewSession } from '../domain/types';
 const PENDING_PREFIX = 'pending:';
 const SESSION_PREFIX = 'session:';
 const WINDOW_KEY = 'koseWindowId';
+/** 選択なしで実行されたとき、koseウィンドウに自由入力を開かせる合図（値は時刻） */
+export const SCRATCH_REQUEST_KEY = 'scratchRequest';
+/** 自由入力の下書き。本文をディスクに書かないため session に置く */
+const SCRATCH_DRAFT_KEY = 'scratchDraft';
 
 export const pendingKey = (tabId: number) => `${PENDING_PREFIX}${tabId}`;
 export const sessionKey = (tabId: number) => `${SESSION_PREFIX}${tabId}`;
@@ -54,4 +58,27 @@ export async function getKoseWindowId(): Promise<number | undefined> {
 
 export async function setKoseWindowId(id: number): Promise<void> {
   await chrome.storage.session.set({ [WINDOW_KEY]: id });
+}
+
+export async function requestScratch(now = Date.now()): Promise<void> {
+  await chrome.storage.session.set({ [SCRATCH_REQUEST_KEY]: now });
+}
+
+/** 自由入力を開く合図を取り出して消す。合図があればその時刻を返す */
+export async function takeScratchRequest(): Promise<number | undefined> {
+  const stored = await chrome.storage.session.get(SCRATCH_REQUEST_KEY);
+  const at = stored[SCRATCH_REQUEST_KEY];
+  if (at === undefined) return undefined;
+  await chrome.storage.session.remove(SCRATCH_REQUEST_KEY);
+  return typeof at === 'number' ? at : 0;
+}
+
+export async function loadScratchDraft(): Promise<string> {
+  const stored = await chrome.storage.session.get(SCRATCH_DRAFT_KEY);
+  const draft = stored[SCRATCH_DRAFT_KEY];
+  return typeof draft === 'string' ? draft : '';
+}
+
+export async function saveScratchDraft(draft: string): Promise<void> {
+  await chrome.storage.session.set({ [SCRATCH_DRAFT_KEY]: draft });
 }

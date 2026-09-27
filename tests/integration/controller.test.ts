@@ -11,7 +11,9 @@ import type {
   RewriteRequest,
   RewriteResult,
 } from '../../src/domain/types';
-import { putPending } from '../../src/storage/sessionStore';
+import { loadMistakes, saveMistakes } from '../../src/storage/mistakeStore';
+import { putPending, requestScratch } from '../../src/storage/sessionStore';
+import { SCRATCH_TAB_ID } from '../../src/domain/session';
 import { saveSettings, Settings } from '../../src/storage/settings';
 import { fakeChrome } from '../fakeChrome';
 
@@ -120,7 +122,7 @@ describe('KoseController', () => {
     expect(snap().partialText).toBeNull();
   });
 
-  it('ウィンドウを開いた時点と仕上がり言語の変更時に準備（prewarm）する', async () => {
+  it('ウィンドウを開いた時点と機能（仕上がりの言語）の変更時に準備（prewarm）する', async () => {
     const { provider, controller } = await setup();
     expect(provider.prewarmed).toEqual(['en']);
     await controller.updateSettings({ targetLanguage: 'ja' });
@@ -600,5 +602,176 @@ describe('KoseController', () => {
     expect(byTab).toEqual(new Map([[1, 'idle'], [2, 'interrupted']]));
     // アクティブタブのセッションを表示する
     expect(snap().displayed?.source.tabId).toBe(1);
+  });
+
+  describe('間違いの記録と復習クイズ', () => {
+    const ORIGINAL = 'We finally had went back to home.';
+    const REVISED = 'We finally went back home.';
+    const DAY = 24 * 60 * 60 * 1000;
+
+    async function proofread(provider: FakeProvider, tabId: number, snap: () => ReturnType<KoseController['getSnapshot']>) {
+      await putPending(pending(tabId, ORIGINAL, 'en'));
+      await flush();
+      provider.calls.at(-1)!.resolve({ revisedText: REVISED, detectedSourceLanguage: 'en' });
+      await flush();
+      provider.explainCalls.at(-1)!.resolve({
+        explanationJa: '',
+        changes: [
+          { before: 'had went', after: 'went', type: 'objective_error', explanationJa: '過去完了は不要' },
+          { before: 'finally', after: 'finally', type: 'style', explanationJa: '' },
+        ],
+        nuanceWarnings: [],
+        droppedChanges: 0,
+      });
+      await flush();
+      await flush();
+      return snap();
+    }
+
+    it('右クリック直後の案の解説から客観的な誤りを記録する', async () => {
+      const { provider, snap } = await setup();
+      await proofread(provider, 1, snap);
+      const cards = await loadMistakes();
+      expect(cards).toHaveLength(1);
+      expect(cards[0]).toMatchObject({ language: 'en', before: 'had went', after: 'went', count: 1 });
+      // 作った日は出題しない
+      expect(snap().dueCards).toEqual([]);
+    });
+
+    it('自動記録をオフにすると記録しない', async () => {
+      await saveSettings({ autoSaveMistakes: false });
+      const { provider, snap } = await setup();
+      await proofread(provider, 1, snap);
+      expect(await loadMistakes()).toEqual([]);
+    });
+
+    it('新しい実行で期限が来たカードを1枚出し、タブごとに別のカードにする。評価すると期限が延びる', async () => {
+      await saveMistakes(
+        [
+          { language: 'en', before: 'old', after: 'new', explanationJa: '' },
+          { language: 'en', before: 'old2', after: 'new2', explanationJa: '' },
+        ],
+        Date.now() - 2 * DAY,
+      );
+      const { controller, snap } = await setup();
+      expect(snap().dueCards).toHaveLength(2);
+      expect(snap().quizCard).toBeNull();
+
+      await putPending(pending(1));
+      await flush();
+      const first = snap().quizCard!;
+      expect(first).not.toBeNull();
+      await putPending(pending(2));
+      await flush();
+      const second = snap().quizCard!;
+      expect(second.id).not.toBe(first.id);
+
+      await controller.rateCard(second.id, 'good');
+      expect(snap().dueCards.map((c) => c.id)).toEqual([first.id]);
+      // 評価したカードも、その実行の間は表示を続ける
+      expect(snap().quizCard?.id).toBe(second.id);
+      expect(snap().quizCard!.review.dueAt).toBeGreaterThan(Date.now());
+    });
+
+    it('期限が来たカードがない、または設定でオフなら出さない', async () => {
+      await saveMistakes([{ language: 'en', before: 'old', after: 'new', explanationJa: '' }], Date.now());
+      const { snap, controller } = await setup();
+      await putPending(pending(1));
+      await flush();
+      expect(snap().quizCard).toBeNull();
+
+      await saveMistakes([{ language: 'en', before: 'a', after: 'b', explanationJa: '' }], Date.now() - 2 * DAY);
+      await controller.updateSettings({ quizWhileWaiting: false });
+      await putPending(pending(1));
+      await flush();
+      expect(snap().quizCard).toBeNull();
+      expect(snap().dueCards).toHaveLength(1);
+    });
+  });
+
+  describe('自由入力', () => {
+    it('セッションがなければ自由入力を表示する', async () => {
+      const { snap } = await setup();
+      expect(snap().displayedTabId).toBe(SCRATCH_TAB_ID);
+      expect(snap().displayed).toBeNull();
+      expect(snap().scratch.draft).toBe('');
+    });
+
+    it('下書きを storage.session に保存し、開き直すと復元する', async () => {
+      const { controller } = await setup();
+      controller.setScratchDraft('draft text');
+      await flush();
+      expect(fakeChrome().storage.session.data.scratchDraft).toBe('draft text');
+      expect(fakeChrome().storage.local.data.scratchDraft).toBeUndefined();
+      const { snap } = await setup();
+      expect(snap().scratch.draft).toBe('draft text');
+    });
+
+    it('実行すると最後に選んだ機能で自由入力のセッションを作り、下書きは残す', async () => {
+      await saveSettings({ targetLanguage: 'ja' });
+      const { controller, provider, snap } = await setup();
+      controller.setScratchDraft('\n  Hello wrld.\n\n');
+      void controller.runScratch();
+      await flush();
+      expect(provider.calls[0].request).toMatchObject({ sourceText: '  Hello wrld.', targetLanguage: 'ja' });
+      expect(snap().displayedTabId).toBe(SCRATCH_TAB_ID);
+      expect(snap().displayed?.source).toMatchObject({ tabId: SCRATCH_TAB_ID, tabTitle: '自由入力' });
+      expect(snap().scratch.draft).toBe('\n  Hello wrld.\n\n');
+
+      provider.answer(0, 'Hello world.');
+      await flush();
+      expect(snap().displayed?.versions[0].result.revisedText).toBe('Hello world.');
+    });
+
+    it('空の下書きは実行しない', async () => {
+      const { controller, provider } = await setup();
+      controller.setScratchDraft('   \n ');
+      await controller.runScratch();
+      expect(provider.calls).toHaveLength(0);
+    });
+
+    it('選択なしで実行された合図を受けると、表示中のレビューから自由入力に切り替えてフォーカスさせる', async () => {
+      const { snap } = await setup();
+      await putPending(pending(1));
+      await flush();
+      expect(snap().displayedTabId).toBe(1);
+      const seq = snap().scratch.focusSeq;
+
+      await requestScratch();
+      await flush();
+      await flush();
+      expect(snap().displayedTabId).toBe(SCRATCH_TAB_ID);
+      expect(snap().scratch.focusSeq).toBe(seq + 1);
+      expect(fakeChrome().storage.session.data.scratchRequest).toBeUndefined();
+    });
+
+    it('ウィンドウが開く前の合図も起動時に処理する。ページからの実行の方が新しければそちらを表示する', async () => {
+      await putPending(pending(1));
+      await requestScratch();
+      const { snap } = await setup();
+      expect(snap().displayedTabId).toBe(SCRATCH_TAB_ID);
+      expect(snap().scratch.focusSeq).toBe(1);
+      expect(fakeChrome().storage.session.data.scratchRequest).toBeUndefined();
+
+      await requestScratch(0);
+      await putPending(pending(2));
+      const second = await setup();
+      await flush();
+      expect(second.snap().displayedTabId).toBe(2);
+    });
+
+    it('自由入力はタブの切り替えで消えず、セッション一覧から選べる', async () => {
+      const { controller, snap } = await setup();
+      controller.setScratchDraft('memo');
+      void controller.runScratch();
+      await putPending(pending(1));
+      await flush();
+      expect(snap().displayedTabId).toBe(1);
+      controller.showSession(SCRATCH_TAB_ID);
+      expect(snap().displayedTabId).toBe(SCRATCH_TAB_ID);
+      expect(snap().displayed?.sourceText).toBe('memo');
+      controller.onTabRemoved(1);
+      expect(snap().sessions.map((s) => s.source.tabId)).toEqual([SCRATCH_TAB_ID]);
+    });
   });
 });

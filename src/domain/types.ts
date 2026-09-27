@@ -177,3 +177,37 @@ export interface ReviewSession {
   situation: Situation;
   status: SessionStatus;
 }
+
+/** 復習クイズの自己評価 */
+export const RATINGS = ['again', 'hard', 'good', 'easy'] as const;
+export type Rating = (typeof RATINGS)[number];
+
+/** 簡易SM-2の復習状態 */
+export interface ReviewState {
+  /** 次に出題してよい時刻 */
+  dueAt: number;
+  lastReviewedAt?: number;
+  /** 続けて思い出せた回数（Again で 0 に戻る） */
+  repetitions: number;
+  easeFactor: number;
+  intervalDays: number;
+}
+
+/**
+ * 自動保存した間違い（Phase 3）。短い語句だけを持ち、原文全体やURLは持たない。
+ */
+export interface MistakeCard {
+  id: string;
+  /** 重複判定のキー（正規化した before → after） */
+  key: string;
+  language: LanguageCode;
+  before: string;
+  after: string;
+  explanationJa: string;
+  createdAt: number;
+  /** 最後に同じ間違いを検出した時刻 */
+  lastSeenAt: number;
+  /** 検出した回数 */
+  count: number;
+  review: ReviewState;
+}

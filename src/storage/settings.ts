@@ -29,6 +29,10 @@ const settingsSchema = z.object({
   focusOnInvoke: z.boolean().catch(true),
   /** クラウド利用時も解説（2段目）を自動で生成するか。費用が数倍になるので既定はオフ */
   autoExplainCloud: z.boolean().catch(false),
+  /** 同じ言語の校正で見つかった客観的な誤りを自動で記録するか（Phase 3） */
+  autoSaveMistakes: z.boolean().catch(true),
+  /** 改稿を待つ間に復習クイズを1問出すか（Phase 4） */
+  quizWhileWaiting: z.boolean().catch(true),
 });
 
 export type Settings = z.infer<typeof settingsSchema>;

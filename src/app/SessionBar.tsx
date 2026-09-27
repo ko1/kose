@@ -1,24 +1,23 @@
+import { SCRATCH_TAB_ID } from '../domain/session';
 import type { ReviewSession } from '../domain/types';
 
 export function SessionBar({
   sessions,
-  displayed,
+  displayedTabId,
   onSelect,
 }: {
   sessions: ReviewSession[];
-  displayed: ReviewSession | null;
+  displayedTabId: number;
   onSelect: (tabId: number) => void;
 }) {
+  // 自由入力は常に選べる項目として先頭に出す（そのセッションは一覧に重ねない）
+  const pageSessions = sessions.filter((s) => s.source.tabId !== SCRATCH_TAB_ID);
   return (
     <label className="session-bar">
       <span className="visually-hidden">表示するレビュー</span>
-      <select
-        value={displayed?.source.tabId ?? ''}
-        onChange={(e) => onSelect(Number(e.target.value))}
-        title="レビューの元タブ"
-      >
-        {!displayed && <option value="">レビューを選択</option>}
-        {sessions.map((s) => (
+      <select value={displayedTabId} onChange={(e) => onSelect(Number(e.target.value))} title="レビューの元タブ">
+        <option value={SCRATCH_TAB_ID}>✏️ 自由入力</option>
+        {pageSessions.map((s) => (
           <option key={s.id} value={s.source.tabId}>
             {sessionLabel(s)}
           </option>

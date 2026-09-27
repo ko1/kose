@@ -3,7 +3,7 @@ import { ANTHROPIC_ORIGIN } from '../ai/anthropicProvider';
 import { BuiltinProvider } from '../ai/builtinProvider';
 import { OPENAI_ORIGIN } from '../ai/openaiProvider';
 import type { ProviderAvailability } from '../ai/provider';
-import { LANGUAGE_CODES, LanguageCode } from '../domain/types';
+import { LANGUAGE_CODES, LanguageCode, MistakeCard } from '../domain/types';
 import { LANGUAGE_LABELS } from '../domain/labels';
 import {
   ANTHROPIC_MODELS,
@@ -13,6 +13,14 @@ import {
   saveSettings,
   Settings,
 } from '../storage/settings';
+import {
+  clearMistakes,
+  deleteMistake,
+  exportMistakes,
+  importMistakes,
+  loadMistakes,
+  onMistakesChanged,
+} from '../storage/mistakeStore';
 
 /** クラウドプロバイダーごとの接続先（選んだときだけ許可を求め、外したら返す） */
 const CLOUD_ORIGINS: Record<'openai' | 'anthropic', { origin: string; host: string; name: string }> = {
@@ -151,6 +159,8 @@ export function Options() {
         </p>
       </section>
 
+      <MistakesSection settings={settings} save={save} />
+
       <section>
         <h2>ウィンドウ</h2>
         <label className="checkbox">
@@ -159,7 +169,7 @@ export function Options() {
             checked={settings.focusOnInvoke}
             onChange={(e) => save({ focusOnInvoke: e.target.checked })}
           />
-          右クリックで実行したときにkoseウィンドウを前面に出す
+          koseを実行したときにkoseウィンドウを前面に出す
         </label>
       </section>
 
@@ -168,6 +178,137 @@ export function Options() {
       </p>
     </main>
   );
+}
+
+function MistakesSection({
+  settings,
+  save,
+}: {
+  settings: Settings;
+  save: (patch: Partial<Settings>, note?: string) => Promise<void>;
+}) {
+  const [cards, setCards] = useState<MistakeCard[] | null>(null);
+  const [note, setNote] = useState('');
+
+  useEffect(() => {
+    loadMistakes().then(setCards);
+    // koseウィンドウで記録・復習した分もそのまま反映する
+    return onMistakesChanged(setCards);
+  }, []);
+
+  const exportFile = () => {
+    const blob = new Blob([exportMistakes(cards ?? [])], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `kose-mistakes-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const importFile = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const added = await importMistakes(await file.text());
+      setNote(`${added}件を読み込みました（既にある間違いは読み込みません）`);
+    } catch (e) {
+      setNote(`読み込めませんでした: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
+
+  const clearAll = async () => {
+    if (!cards?.length || !confirm(`記録した間違い ${cards.length} 件をすべて削除します。元に戻せません。`)) return;
+    await clearMistakes();
+    setNote('すべて削除しました');
+  };
+
+  const sorted = [...(cards ?? [])].sort((a, b) => b.lastSeenAt - a.lastSeenAt);
+
+  return (
+    <section>
+      <h2>間違いの記録と復習</h2>
+      <label className="checkbox">
+        <input
+          type="checkbox"
+          checked={settings.autoSaveMistakes}
+          onChange={(e) => save({ autoSaveMistakes: e.target.checked })}
+        />
+        同じ言語の校正で見つかった誤りを自動で記録する
+      </label>
+      <p className="hint">
+        記録するのは文法・語法・表記の客観的な誤りだけで、言い換えや翻訳は記録しません。保存するのは誤った語句と直した語句、解説だけで、原文全体やページのURLは保存しません。
+      </p>
+      <p className="hint">
+        間違いは<strong>解説</strong>の変更点から記録するため、解説を生成したときだけ増えます。Chrome内蔵AIでは解説を自動で生成します。クラウド（Claude・OpenAI）では、上の「解説」で自動生成をオンにするか、koseウィンドウで「解説を見る」を押したときに記録されます。
+      </p>
+      {settings.autoSaveMistakes && settings.provider !== 'builtin' && !settings.autoExplainCloud && (
+        <p className="hint warn">
+          現在はクラウドで解説を自動生成しない設定のため、「解説を見る」を押さない限り間違いは記録されません。
+        </p>
+      )}
+      <label className="checkbox">
+        <input
+          type="checkbox"
+          checked={settings.quizWhileWaiting}
+          onChange={(e) => save({ quizWhileWaiting: e.target.checked })}
+        />
+        改稿を待つ間に、復習の時期が来た間違いを1問出す
+      </label>
+
+      <h3 className="mistakes-head">記録した間違い（{cards?.length ?? 0}件）</h3>
+      <div className="actions">
+        <button onClick={exportFile} disabled={!cards?.length}>
+          JSONに書き出す
+        </button>
+        <label className="file-button">
+          JSONから読み込む
+          <input
+            type="file"
+            accept="application/json,.json"
+            onChange={(e) => {
+              importFile(e.target.files?.[0]);
+              e.target.value = '';
+            }}
+          />
+        </label>
+        <button className="danger" onClick={clearAll} disabled={!cards?.length}>
+          すべて削除
+        </button>
+      </div>
+      {note && (
+        <p className="hint" role="status">
+          {note}
+        </p>
+      )}
+      {cards && cards.length === 0 ? (
+        <p className="hint">まだ記録はありません。</p>
+      ) : (
+        <ul className="mistakes">
+          {sorted.map((c) => (
+            <li key={c.id}>
+              <div className="mistake-pair">
+                <del>{c.before}</del> → <ins>{c.after}</ins>
+              </div>
+              {c.explanationJa && <p className="hint">{c.explanationJa}</p>}
+              <div className="mistake-meta">
+                <span>
+                  {LANGUAGE_LABELS[c.language].name}・{c.count}回・最終 {formatDate(c.lastSeenAt)}・次の復習{' '}
+                  {c.review.dueAt <= Date.now() ? '今すぐ' : formatDate(c.review.dueAt)}
+                </span>
+                <button className="link" onClick={() => deleteMistake(c.id)}>
+                  削除
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function formatDate(ms: number): string {
+  return new Date(ms).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' });
 }
 
 interface CloudValues {
