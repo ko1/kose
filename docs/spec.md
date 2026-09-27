@@ -29,7 +29,7 @@ This document is the single source of truth for **kose**, a Chrome extension for
 9. While the rewrite runs, one due mistake may be shown as a quiz (§3).
 10. Writing the result back into the page (Apply/Replace) is not implemented; the result is copied with Copy. Rules for implementing it are in §5.6.
 11. **Free input** (“✏️ Free input”, like Emacs's `*scratch*`): a text area in the kose window for text that is not on a page. Ctrl+Enter (or “kose”) runs kose on it with the current “Mode” and “Situation”, exactly like a selection; the result is shown below the text area with the usual review display. The draft is kept after running.
-    - Shown when kose is invoked with no selection (the text area gets focus), when there are no sessions (with usage instructions under it), and when “✏️ Free input” is chosen in the header's session list, where it is always the first item.
+    - Shown when kose is invoked with no selection (the text area gets focus), when there are no sessions (with a one-line hint about the other ways to invoke kose), and when “✏️ Free input” is chosen in the header's session list, where it is always the first item.
     - The free-input review is a session with the special tab ID `SCRATCH_TAB_ID = -1` and `source: { tabId: -1, frameId: 0, tabTitle: <“Free input” in the UI language>, textSource: 'script', editable: false }`. It behaves like a tab's session (one at a time; running again replaces it; waiting-time quiz; mistakes are recorded), but no browser tab closes it, so it lasts until the browser exits.
     - The draft is saved in `chrome.storage.session` (never written to disk), like sessions.
 
@@ -57,7 +57,7 @@ The chosen situation is saved and reused. The situation is not inferred from the
 
 ### 1.3 Layout of the kose window
 
-The header shows the **source tab** (page title) of the displayed session and a session list (dropdown) so the user can pick another session without switching tabs. The list always starts with “✏️ Free input”. With no sessions, the window shows the free input with usage instructions. When mistake cards are due, the header shows a “Review N” button that switches the main area to a quiz over those cards (§3); a new invocation switches back to the review. The list of saved mistakes lives on the options page.
+The header shows the **source tab** (page title) of the displayed session and a session list (dropdown) so the user can pick another session without switching tabs. The list always starts with “✏️ Free input”. With no sessions, the window shows the free input with a one-line hint about the other ways to invoke kose. When mistake cards are due, the header shows a “Review N” button that switches the main area to a quiz over those cards (§3); a new invocation switches back to the review. The list of saved mistakes lives on the options page.
 
 ```
 ┌─────────────────────────────────────────┐

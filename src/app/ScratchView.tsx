@@ -50,17 +50,12 @@ export function ScratchView({
         rows={6}
       />
       <div className="scratch-actions">
-        <span className="note">{M.scratch.hint}</span>
         <button className="primary" disabled={!canRun} onClick={onRun}>
           {M.scratch.run}
         </button>
       </div>
       {!hasOtherSessions && (
-        <div className="empty">
-          {M.scratch.usage.map((line) => (
-            <p key={line}>{line}</p>
-          ))}
-        </div>
+        <p className="note">{M.scratch.usage}</p>
       )}
     </section>
   );

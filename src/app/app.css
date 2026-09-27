@@ -430,19 +430,8 @@ button.link {
 
 .scratch-actions {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  justify-content: flex-end;
   margin-top: 4px;
-}
-
-.scratch-actions .note {
-  margin: 0;
-}
-
-.scratch .empty {
-  margin-top: 12px;
-  font-size: 13px;
 }
 
 .badge-repeated {
