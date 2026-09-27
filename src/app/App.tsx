@@ -43,7 +43,12 @@ export function App({ controller }: { controller: KoseController }) {
       </header>
       <SettingsBar
         settings={settings}
-        canRegenerate={!!displayed && displayed.status.kind !== 'running' && settingsChanged(displayed, settings)}
+        canRegenerate={
+          !!displayed &&
+          displayed.status.kind !== 'running' &&
+          chatState?.kind !== 'running' &&
+          settingsChanged(displayed, settings)
+        }
         onChange={(patch) => controller.updateSettings(patch)}
         onRegenerate={() => displayed && controller.regenerate(displayed.source.tabId)}
       />

@@ -90,17 +90,17 @@ export function createFakeChrome() {
     contextMenus: {
       created: [] as unknown[],
       onClicked: new FakeEvent<[unknown, unknown]>(),
-      create(props: unknown) {
+      create(props: unknown, cb?: () => void) {
         fake.contextMenus.created.push(props);
+        cb?.();
       },
       async update(id: string, props: Record<string, unknown>) {
         const item = fake.contextMenus.created.find((m) => (m as { id: string }).id === id);
         if (!item) throw new Error(`Cannot find menu item with id ${id}`);
         Object.assign(item as object, props);
       },
-      removeAll(cb?: () => void) {
+      async removeAll() {
         fake.contextMenus.created = [];
-        cb?.();
       },
     },
     scripting: {

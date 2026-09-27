@@ -17,15 +17,28 @@ export function invokeTitle(targetLanguage: LanguageCode): string {
 /** 右クリックは1項目だけにする（2項目以上だと Chrome が拡張名のサブメニューにまとめてしまう） */
 export async function createMenus(): Promise<void> {
   const { targetLanguage } = await loadSettings();
-  chrome.contextMenus.removeAll(() => {
-    chrome.contextMenus.create({ id: MENU_ID, title: invokeTitle(targetLanguage), contexts: ['selection'] });
-  });
-  await chrome.action.setTitle({ title: invokeTitle(targetLanguage) });
+  const title = invokeTitle(targetLanguage);
+  // 作成が終わるまで待つ（直後の表示名の更新が、まだ無い項目に対して失敗しないように）
+  await chrome.contextMenus.removeAll();
+  await new Promise<void>((resolve, reject) =>
+    chrome.contextMenus.create({ id: MENU_ID, title, contexts: ['selection'] }, () => {
+      const error = chrome.runtime.lastError;
+      if (error) reject(new Error(error.message));
+      else resolve();
+    }),
+  );
+  await chrome.action.setTitle({ title });
 }
 
 export async function updateInvokeTitles(targetLanguage: LanguageCode): Promise<void> {
   const title = invokeTitle(targetLanguage);
-  await Promise.all([chrome.contextMenus.update(MENU_ID, { title }), chrome.action.setTitle({ title })]);
+  await chrome.action.setTitle({ title });
+  try {
+    await chrome.contextMenus.update(MENU_ID, { title });
+  } catch {
+    // 項目がまだ無い（作成前・作成失敗）なら作り直す。作り直しは最新の設定を読む
+    await createMenus();
+  }
 }
 
 export async function handleMenuClick(

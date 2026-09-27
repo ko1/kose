@@ -25,4 +25,9 @@ describe('settings', () => {
     const loaded = await loadSettings();
     expect(loaded).toMatchObject({ targetLanguage: 'ja', situation: 'business', provider: 'openai' });
   });
+
+  it('続けて保存しても前の変更を失わない（ページをまたいで直列化する）', async () => {
+    await Promise.all([saveSettings({ targetLanguage: 'ja' }), saveSettings({ situation: 'technical' })]);
+    expect(await loadSettings()).toMatchObject({ targetLanguage: 'ja', situation: 'technical' });
+  });
 });

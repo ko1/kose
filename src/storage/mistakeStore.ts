@@ -3,6 +3,7 @@ import { mergeMistakes, MistakeCandidate, mistakeKey } from '../domain/mistakes'
 import { rate } from '../domain/srs';
 import { LANGUAGE_CODES, MistakeCard, Rating } from '../domain/types';
 import { newId } from '../shared/ids';
+import { withLock } from './lock';
 import { M } from '../shared/messages';
 
 /**
@@ -53,17 +54,13 @@ export async function loadMistakes(): Promise<MistakeCard[]> {
   return parseCards(stored[KEY]);
 }
 
-// 同じページ内の読み書きを直列化する（読み込み→変更→書き込みの間に別の変更が割り込まないように）
-let queue: Promise<unknown> = Promise.resolve();
-
+/** 読み込み→変更→書き込みの間に、別のページ（koseウィンドウ・設定画面）の変更が割り込まないようにする */
 function modify(fn: (cards: MistakeCard[]) => MistakeCard[]): Promise<MistakeCard[]> {
-  const run = queue.then(async () => {
+  return withLock(KEY, async () => {
     const next = fn(await loadMistakes());
     await chrome.storage.local.set({ [KEY]: next });
     return next;
   });
-  queue = run.catch(() => {});
-  return run;
 }
 
 export function saveMistakes(candidates: readonly MistakeCandidate[], now = Date.now()): Promise<MistakeCard[]> {

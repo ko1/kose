@@ -19,6 +19,13 @@ describe('context menu', () => {
     expect(c.action.title).toBe('kose: Make it good Japanese');
   });
 
+  it('項目がまだ無いときの表示名の更新は、項目を作り直す', async () => {
+    const c = fakeChrome();
+    await saveSettings({ targetLanguage: 'ja' });
+    await updateInvokeTitles('ja');
+    expect(c.contextMenus.created).toEqual([{ id: 'kose', title: 'kose: Make it good Japanese', contexts: ['selection'] }]);
+  });
+
   it('機能を変えると表示を更新する', async () => {
     const c = fakeChrome();
     await createMenus();

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dueCards, extractMistakes, knownMistake, mergeMistakes, mistakeKey } from '../../src/domain/mistakes';
+import { dueCards, extractMistakes, knownMistake, mergeMistakes, mistakeKey, scrubSensitive } from '../../src/domain/mistakes';
 import { DAY_MS } from '../../src/domain/srs';
 import type { Change, ResultVersion, ReviewSession } from '../../src/domain/types';
 
@@ -78,6 +78,37 @@ describe('extractMistakes', () => {
     expect(extractMistakes(session, version)).toHaveLength(1);
     const longFixture = fixture([change(long, 'went')], {}, { sourceText: `${long} back` });
     expect(extractMistakes(longFixture.session, longFixture.version)).toEqual([]);
+  });
+});
+
+describe('extractMistakes: 原文全体や個人を特定しうる文字列は保存しない', () => {
+  it('語句が原文・改稿文そのものなら記録しない', () => {
+    const f = fixture([change('I has a pen.', 'I have a pen.')], {
+      result: { revisedText: 'I have a pen.', detectedSourceLanguage: 'en' },
+    }, { sourceText: 'I has a pen.' });
+    expect(extractMistakes(f.session, f.version)).toEqual([]);
+  });
+
+  it('URL・メールアドレス・パスを含む語句は記録せず、解説の中のものは伏せる', () => {
+    const source = 'see https://secret.example/x and mail bob@example.com in ~/private/notes and We finally had went back';
+    const revised = 'see https://secret.example/x. and mail bob@example.com. in ~/private/notes. and We finally went back';
+    const f = fixture(
+      [
+        change('https://secret.example/x', 'https://secret.example/x.'),
+        change('bob@example.com', 'bob@example.com.'),
+        change('~/private/notes', '~/private/notes.'),
+        { ...change('had went', 'went'), explanation: 'like https://a.example/p or c@d.jp' },
+      ],
+      { result: { revisedText: revised, detectedSourceLanguage: 'en' } },
+      { sourceText: source },
+    );
+    expect(extractMistakes(f.session, f.version)).toEqual([
+      { language: 'en', before: 'had went', after: 'went', explanation: 'like … or …' },
+    ]);
+  });
+
+  it('and/or のような斜線は伏せない', () => {
+    expect(scrubSensitive('use and/or here')).toBe('use and/or here');
   });
 });
 

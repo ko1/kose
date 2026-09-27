@@ -288,6 +288,26 @@ describe('KoseController', () => {
       ]);
     });
 
+    it('相談の返答待ちに作り直すと相談を止め、作り直した案だけが追加される', async () => {
+      const { provider, controller, snap } = await reviewed();
+      void controller.sendChat(1, 'もっと丁寧に');
+      await flush();
+      await controller.updateSettings({ situation: 'business' });
+      void controller.regenerate(1);
+      await flush();
+      expect(provider.chatCalls[0].signal?.aborted).toBe(true);
+      expect(snap().chatState).toBeNull();
+
+      provider.chatCalls[0].resolve({ reply: '遅れて届いた返答', revisedText: 'Late chat version.' });
+      provider.calls.at(-1)!.resolve({ revisedText: 'Regenerated.', detectedSourceLanguage: 'ja' });
+      await flush();
+      await flush();
+      const versions = snap().displayed!.versions;
+      expect(versions.map((v) => v.origin)).toEqual(['initial', 'regenerate']);
+      expect(versions[1].result.revisedText).toBe('Regenerated.');
+      expect(snap().displayed!.messages.map((m) => m.role)).toEqual(['user']);
+    });
+
     it('次のレビューや他タブのレビューに会話が混ざらない', async () => {
       const { provider, controller } = await reviewed();
       const sent = controller.sendChat(1, '質問1');

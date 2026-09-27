@@ -261,6 +261,8 @@ export class KoseController {
   async regenerate(tabId: number): Promise<void> {
     const session = this.sessions.get(tabId);
     if (!session) return;
+    // 相談の返答が作り直しと入れ違いに案を追加しないよう、実行中の相談は止める
+    this.abortChat(tabId);
     this.update(tabId, {
       ...session,
       targetLanguage: this.settings.targetLanguage,
@@ -437,7 +439,8 @@ export class KoseController {
         this.emit();
       });
       const latest = this.sessions.get(tabId);
-      if (abort.signal.aborted || latest?.id !== session.id) return;
+      // 作り直しなどで改稿が実行中になっていたら、古い前提の返答は反映しない
+      if (abort.signal.aborted || latest?.id !== session.id || latest.status.kind === 'running') return;
       this.chatStates.delete(tabId);
 
       let next = latest;

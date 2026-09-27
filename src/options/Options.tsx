@@ -114,7 +114,10 @@ export function Options() {
         title={M.options.claude}
         keyPlaceholder="sk-ant-..."
         defaultModel={DEFAULT_ANTHROPIC_MODEL}
-        modelOptions={ANTHROPIC_MODELS}
+        modelOptions={ANTHROPIC_MODELS.map((m) => ({
+          id: m.id,
+          label: `${m.name} — ${M.options.modelTiers[m.tier]} (${m.price})`,
+        }))}
         effortOptions={[
           { id: 'low', label: M.options.effortLow },
           { id: 'medium', label: 'medium' },

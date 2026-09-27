@@ -4,6 +4,19 @@ import type { LanguageCode, MistakeCard, ResultVersion, ReviewSession } from './
 /** 保存する語句の上限（原文全体を保存しないため） */
 export const MAX_PHRASE_CHARS = 40;
 
+/** URL・メールアドレス・ファイルパスらしい文字列（個人や組織を特定しうるので保存しない） */
+const SENSITIVE = /\b(?:https?:\/\/|www\.)\S+|[\w.+-]+@[\w-]+\.[\w.-]+|(?:^|\s)(?:[A-Za-z]:\\|~?\/)\S+/gi;
+
+function containsSensitive(text: string): boolean {
+  SENSITIVE.lastIndex = 0;
+  return SENSITIVE.test(text);
+}
+
+/** 解説文の中の URL・メールアドレス・パスを伏せる */
+export function scrubSensitive(text: string): string {
+  return text.replace(SENSITIVE, (m) => (/^\s/.test(m) ? `${m[0]}…` : '…'));
+}
+
 export interface MistakeCandidate {
   language: LanguageCode;
   before: string;
@@ -36,10 +49,13 @@ export function extractMistakes(session: ReviewSession, version: ResultVersion):
     if (c.type !== 'objective_error' || before === '' || after === '') continue;
     if (!session.sourceText.includes(c.before) || !version.result.revisedText.includes(c.after)) continue;
     if ([...before].length > MAX_PHRASE_CHARS || [...after].length > MAX_PHRASE_CHARS) continue;
+    // 短い選択範囲では語句が原文・改稿文そのものになりうる。原文全体は保存しない
+    if (before === session.sourceText.trim() || after === version.result.revisedText.trim()) continue;
+    if (containsSensitive(before) || containsSensitive(after)) continue;
     const key = mistakeKey(before, after);
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push({ language, before, after, explanation: c.explanation });
+    out.push({ language, before, after, explanation: scrubSensitive(c.explanation) });
   }
   return out;
 }

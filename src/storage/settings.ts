@@ -1,15 +1,18 @@
 import { z } from 'zod';
 import { LANGUAGE_CODES, SITUATIONS } from '../domain/types';
+import { withLock } from './lock';
 
 export const DEFAULT_OPENAI_MODEL = 'gpt-5-mini';
 export const DEFAULT_ANTHROPIC_MODEL = 'claude-haiku-4-5';
 export const DEFAULT_ANTHROPIC_EXPLAIN_MODEL = 'claude-sonnet-5';
 
-/** 設定画面のモデル選択肢（料金は入力/出力、100万トークンあたり） */
-export const ANTHROPIC_MODELS: { id: string; label: string }[] = [
-  { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5 — fast, cheap ($1 / $5)' },
-  { id: 'claude-sonnet-5', label: 'Claude Sonnet 5 — balanced ($2 / $10)' },
-  { id: 'claude-opus-5', label: 'Claude Opus 5 — highest quality ($5 / $25)' },
+export type ModelTier = 'fast' | 'balanced' | 'best';
+
+/** 設定画面のモデル選択肢（料金は入力/出力、100万トークンあたり）。特徴の表示名は文言カタログにある */
+export const ANTHROPIC_MODELS: { id: string; name: string; tier: ModelTier; price: string }[] = [
+  { id: 'claude-haiku-4-5', name: 'Claude Haiku 4.5', tier: 'fast', price: '$1 / $5' },
+  { id: 'claude-sonnet-5', name: 'Claude Sonnet 5', tier: 'balanced', price: '$2 / $10' },
+  { id: 'claude-opus-5', name: 'Claude Opus 5', tier: 'best', price: '$5 / $25' },
 ];
 
 const settingsSchema = z.object({
@@ -51,10 +54,13 @@ export async function loadSettings(): Promise<Settings> {
   return normalizeSettings(stored[KEY]);
 }
 
-export async function saveSettings(patch: Partial<Settings>): Promise<Settings> {
-  const next = normalizeSettings({ ...(await loadSettings()), ...patch });
-  await chrome.storage.local.set({ [KEY]: next });
-  return next;
+/** 続けて変更しても片方が失われないよう、読み込み→書き込みをページをまたいで直列化する */
+export function saveSettings(patch: Partial<Settings>): Promise<Settings> {
+  return withLock(KEY, async () => {
+    const next = normalizeSettings({ ...(await loadSettings()), ...patch });
+    await chrome.storage.local.set({ [KEY]: next });
+    return next;
+  });
 }
 
 export function onSettingsChanged(listener: (settings: Settings) => void): () => void {
