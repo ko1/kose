@@ -1,0 +1,96 @@
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --bg-subtle: #f5f6f8;
+  --fg: #1d1f23;
+  --fg-muted: #626873;
+  --border: #d9dce1;
+  --accent: #2463eb;
+  --accent-fg: #ffffff;
+  --ins-bg: #d8f5dd;
+  --ins-fg: #11632a;
+  --del-bg: #fde0e0;
+  --del-fg: #9b1c1c;
+  --warn-bg: #fff6db;
+  --warn-fg: #7a5500;
+  --error-bg: #fde8e8;
+  --error-fg: #9b1c1c;
+  --radius: 6px;
+  font-family: system-ui, 'Segoe UI', 'Hiragino Sans', 'Yu Gothic UI', Meiryo, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1b1d21;
+    --bg-subtle: #25282d;
+    --fg: #e6e8eb;
+    --fg-muted: #9aa1ab;
+    --border: #3a3e45;
+    --accent: #6d9bff;
+    --accent-fg: #0d1117;
+    --ins-bg: #1d3b25;
+    --ins-fg: #8fe0a2;
+    --del-bg: #45201f;
+    --del-fg: #ffaaa5;
+    --warn-bg: #3b3218;
+    --warn-fg: #f1d27c;
+    --error-bg: #45201f;
+    --error-fg: #ffaaa5;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+button,
+select,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px 12px;
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+}
+
+select,
+input[type='text'],
+input[type='password'],
+input[type='number'] {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px 8px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}

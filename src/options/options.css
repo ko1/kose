@@ -1,0 +1,76 @@
+.options {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.options h1 {
+  font-size: 20px;
+}
+
+.options h2 {
+  font-size: 15px;
+  margin-top: 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.radio,
+.checkbox {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 8px 0;
+}
+
+.radio input {
+  margin-top: 4px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 10em 1fr;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.hint,
+.builtin-status {
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+.builtin-status {
+  margin: 0 0 8px 24px;
+}
+
+.message {
+  min-height: 1.5em;
+  color: var(--accent);
+}
+
+code {
+  font-size: 12px;
+}
+
+.model-select {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.saved {
+  color: var(--ins-fg);
+  font-size: 13px;
+}
+
+.unsaved {
+  color: var(--warn-fg);
+  font-size: 13px;
+}
