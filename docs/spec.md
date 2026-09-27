@@ -391,7 +391,7 @@ tests/
 - Unit tests: settings persistence, target-language branching, safe behavior on invalid model JSON, partial JSON parsing for streaming, language detection, pricing, auto-save conditions and merging, SM-2, version switching, session isolation (per right-click and per tab), active-tab following.
 - Integration tests (Vitest with faked chrome APIs): `onClicked` → pending request → window creation/reuse, restoring pending requests in the kose window, cancelling/discarding earlier requests in the same tab while other tabs continue, cleanup on tab close, built-in AI unavailable, missing API key, two-stage explanation (automatic vs. on demand), chat (new version vs. explanation only, history, isolation, retry), auto-save disabled.
 - Manual tests (checklist in the README) with Chrome on Windows: selections on normal pages, GitHub and inside textareas; multi-paragraph line breaks; following across tabs and browser windows; restoring sessions and window position/size after reopening the kose window; limitations in the PDF viewer and Chrome internal pages.
-- Build with Node.js in `/home/ko1/app/kose` on WSL2 and load `\\wsl.localhost\Ubuntu\home\ko1\app\kose\dist` with **Load unpacked** in Chrome on Windows (`npm run build:win` copies the build to Windows if needed). Check Chrome built-in AI against Chrome's requirements for Windows.
+- Build with Node.js on WSL2 and load `dist/` through the WSL path (e.g. `\\wsl.localhost\<distro>\...\dist`) with **Load unpacked** in Chrome on Windows (`npm run build:win` copies the build to Windows if needed). Check Chrome built-in AI against Chrome's requirements for Windows.
 
 ## 9. Initial instruction for Claude Code
 

@@ -23,25 +23,28 @@ Implemented so far: **Phase 1 (rewrite)** and **Phase 2 (nuance chat)**. Automat
 
 - Google Chrome 138 or later (tested with Chrome 154 on Windows)
 - For Chrome built-in AI (Prompt API / Gemini Nano): Chrome's hardware requirements (free disk space, GPU or CPU/RAM). The model (~4 GB) is downloaded on first use.
-- Development: Node.js 22+ on WSL2 (tested with Node.js 24)
+- To build: Node.js 22 or later (tested with Node.js 24)
 
-## Setup and build (WSL2)
+## Build
 
 ```sh
-cd /home/ko1/app/kose
+git clone https://github.com/ko1/kose.git
+cd kose
 npm install
 npm run check        # typecheck + tests + build
 ```
 
-The build output goes to `dist/`.
+The extension is built into `dist/`.
 
-### Loading into Chrome on Windows
+## Install into Chrome
 
 1. Open `chrome://extensions` and turn on **Developer mode**
-2. **Load unpacked** and select `\\wsl.localhost\Ubuntu\home\ko1\app\kose\dist`
+2. Click **Load unpacked** and select the `dist/` directory
 3. After changing the code, run `npm run build` and press the reload button on the kose card
 
-If loading from the WSL path is unreliable (e.g. Chrome starts before WSL), copy the build to Windows instead:
+### Building on WSL2 for Chrome on Windows
+
+You can load `dist/` directly through the WSL path, e.g. `\\wsl.localhost\<distro>\home\<user>\kose\dist`. If that is unreliable (e.g. Chrome starts before WSL), copy the build to the Windows side instead:
 
 ```sh
 npm run build:win    # build and copy to %USERPROFILE%\kose-dist
@@ -160,3 +163,7 @@ tests/
 ```
 
 UI strings and code comments are in Japanese.
+
+## License
+
+Copyright (c) 2026 Koichi Sasada. All rights reserved. See [LICENSE](LICENSE).

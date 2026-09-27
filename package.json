@@ -2,6 +2,7 @@
   "name": "kose",
   "version": "0.1.0",
   "private": true,
+  "license": "UNLICENSED",
   "type": "module",
   "description": "Chrome extension that rewrites selected text into good Japanese or English",
   "scripts": {
