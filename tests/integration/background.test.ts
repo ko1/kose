@@ -15,16 +15,16 @@ describe('context menu', () => {
     const c = fakeChrome();
     await saveSettings({ targetLanguage: 'ja' });
     await createMenus();
-    expect(c.contextMenus.created).toEqual([{ id: 'kose', title: 'kose: よい日本語にする', contexts: ['selection'] }]);
-    expect(c.action.title).toBe('kose: よい日本語にする');
+    expect(c.contextMenus.created).toEqual([{ id: 'kose', title: 'kose: Make it good Japanese', contexts: ['selection'] }]);
+    expect(c.action.title).toBe('kose: Make it good Japanese');
   });
 
   it('機能を変えると表示を更新する', async () => {
     const c = fakeChrome();
     await createMenus();
     await updateInvokeTitles('ja');
-    expect((c.contextMenus.created[0] as { title: string }).title).toBe('kose: よい日本語にする');
-    expect(c.action.title).toBe('kose: よい日本語にする');
+    expect((c.contextMenus.created[0] as { title: string }).title).toBe('kose: Make it good Japanese');
+    expect(c.action.title).toBe('kose: Make it good Japanese');
   });
 });
 

@@ -1,6 +1,6 @@
-import { LANGUAGE_LABELS } from '../domain/labels';
 import type { LanguageCode, PendingRequest, SourceLocation } from '../domain/types';
 import { newId } from '../shared/ids';
+import { M } from '../shared/messages';
 import { trimSelection } from '../domain/text';
 import { putPending, removeTabData, requestScratch } from '../storage/sessionStore';
 import { loadSettings } from '../storage/settings';
@@ -11,7 +11,7 @@ export const MENU_ID = 'kose';
 
 /** 右クリックメニュー・ツールバーボタンの表示。最後に選んだ機能を示す */
 export function invokeTitle(targetLanguage: LanguageCode): string {
-  return `kose: ${LANGUAGE_LABELS[targetLanguage].target}にする`;
+  return M.menu.invokeTitle(M.languages[targetLanguage].target);
 }
 
 /** 右クリックは1項目だけにする（2項目以上だと Chrome が拡張名のサブメニューにまとめてしまう） */

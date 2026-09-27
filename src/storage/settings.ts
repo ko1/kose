@@ -7,9 +7,9 @@ export const DEFAULT_ANTHROPIC_EXPLAIN_MODEL = 'claude-sonnet-5';
 
 /** 設定画面のモデル選択肢（料金は入力/出力、100万トークンあたり） */
 export const ANTHROPIC_MODELS: { id: string; label: string }[] = [
-  { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5 — 速い・安い（$1 / $5）' },
-  { id: 'claude-sonnet-5', label: 'Claude Sonnet 5 — バランス（$2 / $10）' },
-  { id: 'claude-opus-5', label: 'Claude Opus 5 — 高品質（$5 / $25）' },
+  { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5 — fast, cheap ($1 / $5)' },
+  { id: 'claude-sonnet-5', label: 'Claude Sonnet 5 — balanced ($2 / $10)' },
+  { id: 'claude-opus-5', label: 'Claude Opus 5 — highest quality ($5 / $25)' },
 ];
 
 const settingsSchema = z.object({

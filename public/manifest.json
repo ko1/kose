@@ -2,7 +2,8 @@
   "manifest_version": 3,
   "name": "kose",
   "version": "0.1.0",
-  "description": "選択した文章を、よい日本語・よい英語に改善します。",
+  "description": "__MSG_description__",
+  "default_locale": "en",
   "minimum_chrome_version": "138",
   "incognito": "not_allowed",
   "permissions": ["contextMenus", "storage", "activeTab", "scripting"],
@@ -17,7 +18,7 @@
   "commands": {
     "run-kose": {
       "suggested_key": { "default": "Alt+K" },
-      "description": "選択した文章を、最後に選んだ仕上がりで kose にかける"
+      "description": "__MSG_commandRun__"
     }
   },
   "options_page": "options.html",

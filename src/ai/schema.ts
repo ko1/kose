@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { M } from '../shared/messages';
 import type { ChatReply, Explanation, RewriteResult } from '../domain/types';
 
 // モデルに返させるJSONの形。OpenAI Structured Outputs の strict モード、
@@ -12,13 +13,13 @@ export const rewriteOutputSchema = z.strictObject({
 
 /** 2段目: 解説 */
 export const explainOutputSchema = z.strictObject({
-  explanationJa: z.string(),
+  explanation: z.string(),
   changes: z.array(
     z.strictObject({
       before: z.string(),
       after: z.string(),
       type: z.enum(['objective_error', 'style', 'uncertain']),
-      explanationJa: z.string(),
+      explanation: z.string(),
     }),
   ),
   nuanceWarnings: z.array(z.string()),
@@ -37,7 +38,7 @@ export const explainWithStructureOutputSchema = explainOutputSchema.extend({
  * null を使うと各APIの構造化出力で扱いが分かれるので、空文字で「なし」を表す。
  */
 export const chatOutputSchema = z.strictObject({
-  replyJa: z.string(),
+  reply: z.string(),
   revisedText: z.string(),
 });
 
@@ -63,11 +64,11 @@ function parseJson<T>(raw: string, schema: z.ZodType<T>): T {
   try {
     json = JSON.parse(stripCodeFence(raw));
   } catch {
-    throw new InvalidModelOutputError('AIの応答がJSONとして解釈できませんでした。');
+    throw new InvalidModelOutputError(M.errors.invalidJson);
   }
   const parsed = schema.safeParse(json);
   if (!parsed.success) {
-    throw new InvalidModelOutputError('AIの応答が想定した形式ではありませんでした。');
+    throw new InvalidModelOutputError(M.errors.invalidShape);
   }
   return parsed.data;
 }
@@ -76,7 +77,7 @@ function parseJson<T>(raw: string, schema: z.ZodType<T>): T {
 export function parseRewriteOutput(raw: string): RewriteResult {
   const out = parseJson(raw, rewriteOutputSchema);
   if (out.revisedText.trim() === '') {
-    throw new InvalidModelOutputError('AIの応答に改稿文が含まれていませんでした。');
+    throw new InvalidModelOutputError(M.errors.noRewrite);
   }
   return out;
 }
@@ -111,12 +112,12 @@ function stripCodeFence(raw: string): string {
 /** 相談の出力を検証する。改稿案が空、または表示中の案と同じなら「改稿なし」とする */
 export function parseChatOutput(raw: string, currentRevisedText: string): ChatReply {
   const out = parseJson(raw, chatOutputSchema);
-  if (out.replyJa.trim() === '') {
-    throw new InvalidModelOutputError('AIの応答に返答が含まれていませんでした。');
+  if (out.reply.trim() === '') {
+    throw new InvalidModelOutputError(M.errors.noReply);
   }
   const revised = out.revisedText.trim();
   return {
-    replyJa: out.replyJa,
+    reply: out.reply,
     revisedText: revised === '' || revised === currentRevisedText.trim() ? undefined : out.revisedText,
   };
 }

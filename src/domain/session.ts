@@ -12,6 +12,7 @@ import type {
   VersionOrigin,
 } from './types';
 import { newId } from '../shared/ids';
+import { M } from '../shared/messages';
 import { detectLanguage } from './language';
 
 /** 自由入力のセッションを置く特別なタブID（実在のタブIDは 0 以上） */
@@ -20,7 +21,7 @@ export const SCRATCH_TAB_ID = -1;
 export const SCRATCH_SOURCE: SourceLocation = {
   tabId: SCRATCH_TAB_ID,
   frameId: 0,
-  tabTitle: '自由入力',
+  tabTitle: M.window.scratchTabTitle,
   textSource: 'script',
   editable: false,
 };
@@ -106,7 +107,12 @@ export function appendMessage(session: ReviewSession, message: ChatMessage): Rev
 }
 
 /** 相談の問い合わせを組み立てる。会話はこのセッションのものだけを使う（他のレビューと混ぜない） */
-export function buildChatRequest(session: ReviewSession, message: string, requestId: string): ChatRequest | null {
+export function buildChatRequest(
+  session: ReviewSession,
+  message: string,
+  requestId: string,
+  explanationLanguage: string,
+): ChatRequest | null {
   const current = currentVersion(session);
   if (!current) return null;
   const revisedOf = (versionId?: string) => session.versions.find((v) => v.id === versionId)?.result.revisedText;
@@ -114,6 +120,7 @@ export function buildChatRequest(session: ReviewSession, message: string, reques
     requestId,
     sourceText: session.sourceText,
     targetLanguage: current.targetLanguage,
+    explanationLanguage,
     situation: current.situation,
     currentRevisedText: current.result.revisedText,
     previousRevisedTexts: session.versions.map((v) => v.result.revisedText),

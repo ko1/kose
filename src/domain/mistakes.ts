@@ -8,7 +8,7 @@ export interface MistakeCandidate {
   language: LanguageCode;
   before: string;
   after: string;
-  explanationJa: string;
+  explanation: string;
 }
 
 /** 重複判定のキー。表記ゆれ（全角半角・大文字小文字・空白）だけを吸収する */
@@ -39,7 +39,7 @@ export function extractMistakes(session: ReviewSession, version: ResultVersion):
     const key = mistakeKey(before, after);
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push({ language, before, after, explanationJa: c.explanationJa });
+    out.push({ language, before, after, explanation: c.explanation });
   }
   return out;
 }

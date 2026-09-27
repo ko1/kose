@@ -15,9 +15,6 @@ function priceOf(model: string): { input: number; output: number } | undefined {
   return key ? ANTHROPIC_PRICES[key] : undefined;
 }
 
-/** 表示用の為替レート（概算） */
-export const JPY_PER_USD = 150;
-
 /**
  * トークン数から料金を計算する。料金表にないモデルは undefined。
  * キャッシュ書き込みは入力の1.25倍、読み込みは0.1倍で数える。
@@ -32,9 +29,8 @@ export function anthropicCostUsd(
   return (input * price.input + tokens.output * price.output) / 1_000_000;
 }
 
-/** 「約0.2円」のような表示。料金が分からなければ null */
+/** "$0.0015" のような表示（有効数字2桁）。料金が分からなければ null */
 export function formatCost(usage: Usage | undefined): string | null {
   if (usage?.costUsd === undefined) return null;
-  const yen = usage.costUsd * JPY_PER_USD;
-  return yen < 0.1 ? '0.1円未満' : `約${yen < 10 ? yen.toFixed(1) : Math.round(yen)}円`;
+  return usage.costUsd < 0.0001 ? '<$0.0001' : `$${Number(usage.costUsd.toPrecision(2))}`;
 }

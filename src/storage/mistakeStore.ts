@@ -3,6 +3,7 @@ import { mergeMistakes, MistakeCandidate, mistakeKey } from '../domain/mistakes'
 import { rate } from '../domain/srs';
 import { LANGUAGE_CODES, MistakeCard, Rating } from '../domain/types';
 import { newId } from '../shared/ids';
+import { M } from '../shared/messages';
 
 /**
  * 間違いカードの保存先。koseウィンドウと設定画面の両方が読み書きし、変更通知で同期するため
@@ -25,20 +26,26 @@ const cardSchema = z.object({
   language: z.enum(LANGUAGE_CODES),
   before: z.string().min(1),
   after: z.string().min(1),
-  explanationJa: z.string(),
+  explanation: z.string(),
   createdAt: z.number(),
   lastSeenAt: z.number(),
   count: z.number().int().positive(),
   review: reviewSchema,
 });
 
-/** 壊れた項目は捨てて読む */
+/** 壊れた項目は捨てて読む。解説の項目名が explanationJa だった頃のカードも読めるようにする */
 function parseCards(raw: unknown): MistakeCard[] {
   if (!Array.isArray(raw)) return [];
   return raw.flatMap((item) => {
-    const parsed = cardSchema.safeParse(item);
+    const parsed = cardSchema.safeParse(migrateCard(item));
     return parsed.success ? [parsed.data] : [];
   });
+}
+
+function migrateCard(item: unknown): unknown {
+  if (typeof item !== 'object' || item === null) return item;
+  const { explanationJa, ...rest } = item as Record<string, unknown>;
+  return 'explanation' in rest || explanationJa === undefined ? rest : { ...rest, explanation: explanationJa };
 }
 
 export async function loadMistakes(): Promise<MistakeCard[]> {
@@ -94,7 +101,7 @@ export function exportMistakes(cards: readonly MistakeCard[], now = Date.now()):
 export async function importMistakes(json: string): Promise<number> {
   const data: unknown = JSON.parse(json);
   if (typeof data !== 'object' || data === null || (data as { format?: unknown }).format !== EXPORT_FORMAT) {
-    throw new Error('koseの間違いメモの書き出しファイルではありません');
+    throw new Error(M.errors.notMistakeExport);
   }
   const incoming = parseCards((data as { cards?: unknown }).cards);
   let added = 0;

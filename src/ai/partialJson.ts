@@ -42,7 +42,8 @@ export function appendChunk(accumulated: string, chunk: string): string {
 
 /**
  * 生成途中のJSONを、閉じていない文字列・配列・オブジェクトを補って解釈する。
- * 最後の要素が途中で切れていて解釈できない場合は、直前の区切りまで戻して再試行する。
+ * 最後の要素が途中で切れていて解釈できない場合は、直前の区切り（, { [）まで戻して再試行する。
+ * { [ でも戻すのは、`[{"befo` のようにキーの途中で切れたとき、配列ごと消えて表示が巻き戻らないようにするため。
  * 解釈できなければ null。
  */
 export function parsePartialJson(raw: string): unknown {
@@ -51,7 +52,7 @@ export function parsePartialJson(raw: string): unknown {
     try {
       return JSON.parse(closeJson(text));
     } catch {
-      const cut = text.lastIndexOf(',');
+      const cut = Math.max(text.lastIndexOf(','), text.lastIndexOf('{'), text.lastIndexOf('['));
       if (cut < 0) return null;
       text = text.slice(0, cut);
     }
@@ -94,7 +95,7 @@ export function extractPartialExplanation(raw: string): PartialExplanation | nul
   if (typeof json !== 'object' || json === null) return null;
   const obj = json as Record<string, unknown>;
   const out: PartialExplanation = {};
-  if (typeof obj.explanationJa === 'string') out.explanationJa = obj.explanationJa;
+  if (typeof obj.explanation === 'string') out.explanation = obj.explanation;
   if (Array.isArray(obj.changes)) {
     out.changes = obj.changes.filter(
       (c): c is Change =>
@@ -103,7 +104,7 @@ export function extractPartialExplanation(raw: string): PartialExplanation | nul
         typeof c.before === 'string' &&
         typeof c.after === 'string' &&
         CHANGE_TYPES.has(c.type) &&
-        typeof c.explanationJa === 'string',
+        typeof c.explanation === 'string',
     );
   }
   if (Array.isArray(obj.nuanceWarnings)) {

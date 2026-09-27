@@ -1,0 +1,4 @@
+{
+  "description": { "message": "選択した文章を、よい日本語・よい英語に改善します。" },
+  "commandRun": { "message": "選択した文章を、最後に選んだ機能で kose にかける" }
+}

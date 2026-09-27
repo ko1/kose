@@ -16,6 +16,8 @@ import type { MistakeCard, PartialExplanation, PendingRequest, Rating, ReviewSes
 import { needsStructureReview } from '../domain/structure';
 import { trimSelection } from '../domain/text';
 import { newId } from '../shared/ids';
+import { uiLanguage } from '../shared/locale';
+import { M } from '../shared/messages';
 import { loadMistakes, onMistakesChanged, rateMistake, saveMistakes } from '../storage/mistakeStore';
 import {
   isPendingKey,
@@ -302,7 +304,7 @@ export class KoseController {
     try {
       await Promise.race([prepared, polled]);
     } catch (e) {
-      this.setStatus(tabId, { kind: 'error', message: `モデルをダウンロードできませんでした: ${errorMessage(e)}` });
+      this.setStatus(tabId, { kind: 'error', message: M.review.downloadFailed(errorMessage(e)) });
       return;
     } finally {
       finished = true;
@@ -335,6 +337,7 @@ export class KoseController {
           targetLanguage: version.targetLanguage,
           situation: version.situation,
           reviewStructure: needsStructureReview(version.result.revisedText),
+          explanationLanguage: uiLanguage(),
         },
         abort.signal,
         (partial) => {
@@ -409,7 +412,12 @@ export class KoseController {
     const session = this.sessions.get(tabId);
     const last = session?.messages.at(-1);
     if (!session || last?.role !== 'user') return;
-    const request = buildChatRequest({ ...session, messages: session.messages.slice(0, -1) }, last.content, newId());
+    const request = buildChatRequest(
+      { ...session, messages: session.messages.slice(0, -1) },
+      last.content,
+      newId(),
+      uiLanguage(),
+    );
     const current = session.versions.find((v) => v.id === session.currentVersionId);
     if (!request || !current) return;
 
@@ -443,7 +451,7 @@ export class KoseController {
       }
       next = appendMessage(next, {
         role: 'assistant',
-        content: reply.replyJa,
+        content: reply.reply,
         versionId: reply.revisedText !== undefined ? next.currentVersionId! : undefined,
         usage: reply.usage,
       });

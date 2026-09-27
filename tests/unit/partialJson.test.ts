@@ -11,7 +11,7 @@ describe('extractPartialStringField', () => {
   });
 
   it('閉じた値は閉じ引用符までを返す', () => {
-    expect(extractPartialStringField('{"revisedText":"Hi.","explanationJa":"x"}', 'revisedText')).toBe('Hi.');
+    expect(extractPartialStringField('{"revisedText":"Hi.","explanation":"x"}', 'revisedText')).toBe('Hi.');
   });
 
   it('エスケープをデコードし、途中で切れたエスケープは含めない', () => {
@@ -32,8 +32,13 @@ describe('appendChunk', () => {
 });
 
 describe('parsePartialJson', () => {
+  it('キーの途中で切れても、直前まで出ていた配列を消さない（表示が巻き戻らない）', () => {
+    expect(parsePartialJson('{"a":"x","changes":[{"befo')).toEqual({ a: 'x', changes: [] });
+    expect(parsePartialJson('{"a":"x","changes":[{"before":"has","af')).toEqual({ a: 'x', changes: [{ before: 'has' }] });
+  });
+
   it('閉じていない文字列・配列・オブジェクトを補う', () => {
-    expect(parsePartialJson('{"explanationJa":"途中まで')).toEqual({ explanationJa: '途中まで' });
+    expect(parsePartialJson('{"explanation":"途中まで')).toEqual({ explanation: '途中まで' });
     expect(parsePartialJson('{"a":"x","changes":[{"before":"a","after":"b"},{"before":"c"')).toEqual({
       a: 'x',
       changes: [{ before: 'a', after: 'b' }, { before: 'c' }],
@@ -56,10 +61,10 @@ describe('parsePartialJson', () => {
 describe('extractPartialExplanation', () => {
   it('完成した変更点・構成の指摘だけを取り出す', () => {
     const raw =
-      '{"explanationJa":"説明","changes":[{"before":"a","after":"b","type":"style","explanationJa":"x"},{"before":"c","after":"d","type":"sty' +
+      '{"explanation":"説明","changes":[{"before":"a","after":"b","type":"style","explanation":"x"},{"before":"c","after":"d","type":"sty' +
       '"}],"nuanceWarnings":[],"structure":{"outline":["導入"],"issues":[{"problem":"順序","suggestion":"入れ替え"},{"problem":"途中';
     const p = extractPartialExplanation(raw);
-    expect(p?.explanationJa).toBe('説明');
+    expect(p?.explanation).toBe('説明');
     expect(p?.changes).toHaveLength(1);
     expect(p?.structure).toEqual({ outline: ['導入'], issues: [{ problem: '順序', suggestion: '入れ替え' }] });
   });

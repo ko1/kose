@@ -25,7 +25,7 @@ export interface Change {
   before: string;
   after: string;
   type: ChangeType;
-  explanationJa: string;
+  explanation: string;
   /** モデル申告。自動保存の十分条件ではない */
   confidence?: number;
 }
@@ -54,7 +54,7 @@ export interface StructureReview {
 
 /** 2段目（解説）の結果 */
 export interface Explanation {
-  explanationJa: string;
+  explanation: string;
   changes: Change[];
   nuanceWarnings: string[];
   /** 長文のときだけ */
@@ -68,7 +68,7 @@ export interface Explanation {
 }
 
 /** 生成途中の解説（表示用） */
-export type PartialExplanation = Partial<Pick<Explanation, 'explanationJa' | 'changes' | 'nuanceWarnings'>> & {
+export type PartialExplanation = Partial<Pick<Explanation, 'explanation' | 'changes' | 'nuanceWarnings'>> & {
   structure?: Partial<StructureReview>;
 };
 
@@ -80,6 +80,8 @@ export interface ExplainRequest {
   situation: Situation;
   /** 長文の構成も見るか */
   reviewStructure: boolean;
+  /** 解説を書く言語（ブラウザの言語。"ja" など） */
+  explanationLanguage: string;
 }
 
 export type VersionOrigin = 'initial' | 'regenerate' | 'chat';
@@ -112,6 +114,8 @@ export interface ChatRequest {
   requestId: string;
   sourceText: string;
   targetLanguage: LanguageCode;
+  /** 返答を書く言語（ブラウザの言語。"ja" など） */
+  explanationLanguage: string;
   situation: Situation;
   /** 表示中の改稿案 */
   currentRevisedText: string;
@@ -123,7 +127,7 @@ export interface ChatRequest {
 }
 
 export interface ChatReply {
-  replyJa: string;
+  reply: string;
   /** 新しい改稿案。解説だけの返答なら undefined */
   revisedText?: string;
   usage?: Usage;
@@ -203,7 +207,7 @@ export interface MistakeCard {
   language: LanguageCode;
   before: string;
   after: string;
-  explanationJa: string;
+  explanation: string;
   createdAt: number;
   /** 最後に同じ間違いを検出した時刻 */
   lastSeenAt: number;

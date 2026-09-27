@@ -1,6 +1,7 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { currentVersion, SCRATCH_TAB_ID } from '../domain/session';
 import type { MistakeCard, Rating, ReviewSession } from '../domain/types';
+import { M } from '../shared/messages';
 import type { Settings } from '../storage/settings';
 import type { KoseController } from './controller';
 import { buildDebugExport } from './debugExport';
@@ -17,7 +18,7 @@ export function App({ controller }: { controller: KoseController }) {
   // 新しく kose を実行したら、その結果を見せるため復習をやめる
   const newestId = snapshot?.sessions[0]?.id;
   useEffect(() => setReviewing(null), [newestId]);
-  if (!snapshot) return <div className="loading-page">読み込み中…</div>;
+  if (!snapshot) return <div className="loading-page">{M.window.loading}</div>;
   const { displayed, displayedTabId, sessions, settings, download, partialText, explainStates, chatState } = snapshot;
   const { quizCard, dueCards, scratch } = snapshot;
   const showingScratch = displayedTabId === SCRATCH_TAB_ID;
@@ -35,8 +36,8 @@ export function App({ controller }: { controller: KoseController }) {
           }}
         />
         {reviewing === null && dueCards.length > 0 && (
-          <button className="review-button" onClick={() => setReviewing(dueCards)} title="期限が来た間違いを復習する">
-            復習 {dueCards.length}
+          <button className="review-button" onClick={() => setReviewing(dueCards)} title={M.window.reviewButtonTitle}>
+            {M.window.reviewButton(dueCards.length)}
           </button>
         )}
       </header>
@@ -120,18 +121,18 @@ function ReviewQuiz({
   return (
     <section className="section">
       <div className="section-head">
-        <h2>復習</h2>
+        <h2>{M.quiz.heading}</h2>
         <span className="meta">
-          {card ? `${index + 1} / ${cards.length}` : ''}{' '}
+          {card ? M.quiz.progress(index + 1, cards.length) : ''}{' '}
           <button className="link" onClick={onClose}>
-            {card ? 'やめる' : '戻る'}
+            {card ? M.quiz.stop : M.quiz.back}
           </button>
         </span>
       </div>
       {card ? (
         <QuizCard key={card.id} card={card} onRate={(r) => onRate(card.id, r)} onNext={() => setIndex(index + 1)} />
       ) : (
-        <p>今回の復習は終わりです。お疲れさまでした。</p>
+        <p>{M.quiz.done}</p>
       )}
     </section>
   );

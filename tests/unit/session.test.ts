@@ -36,7 +36,7 @@ describe('session', () => {
     let s = createSession(req(1), 'casual');
     s = addVersion(s, result('A'), { targetLanguage: 'en', situation: 'casual' });
     s = addVersion(s, result('B'), { targetLanguage: 'en', situation: 'casual' });
-    const explanation = { explanationJa: 'x', changes: [], nuanceWarnings: [], droppedChanges: 0 };
+    const explanation = { explanation: 'x', changes: [], nuanceWarnings: [], droppedChanges: 0 };
     s = setExplanation(s, s.versions[0].id, explanation);
     expect(s.versions.map((v) => v.explanation)).toEqual([explanation, undefined]);
   });

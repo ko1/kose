@@ -1,4 +1,5 @@
 import { getKoseWindowId, setKoseWindowId } from '../storage/sessionStore';
+import { M } from '../shared/messages';
 
 export const KOSE_PAGE = 'kose.html';
 const BOUNDS_KEY = 'windowBounds';
@@ -30,7 +31,7 @@ export function ensureKoseWindow(focus: boolean): Promise<number> {
       focused: true,
       ...bounds,
     });
-    if (win?.id === undefined) throw new Error('koseウィンドウを作成できませんでした');
+    if (win?.id === undefined) throw new Error(M.window.windowCreateFailed);
     await setKoseWindowId(win.id);
     return win.id;
   };

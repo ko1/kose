@@ -35,10 +35,10 @@ describe('parseRewriteOutput（1段目）', () => {
 
 describe('parseExplainOutput（2段目）', () => {
   const valid = {
-    explanationJa: '時制と前置詞を修正しました。',
+    explanation: '時制と前置詞を修正しました。',
     changes: [
-      { before: 'had went', after: 'went', type: 'objective_error', explanationJa: '過去完了の形が誤り' },
-      { before: 'back to home', after: 'back home', type: 'objective_error', explanationJa: 'home は副詞' },
+      { before: 'had went', after: 'went', type: 'objective_error', explanation: '過去完了の形が誤り' },
+      { before: 'back to home', after: 'back home', type: 'objective_error', explanation: 'home は副詞' },
     ],
     nuanceWarnings: [],
   };
@@ -54,8 +54,8 @@ describe('parseExplainOutput（2段目）', () => {
       ...valid,
       changes: [
         ...valid.changes,
-        { before: 'has gone', after: 'went', type: 'objective_error', explanationJa: '原文にない' },
-        { before: 'had went', after: 'had gone', type: 'objective_error', explanationJa: '改稿文にない' },
+        { before: 'has gone', after: 'went', type: 'objective_error', explanation: '原文にない' },
+        { before: 'had went', after: 'had gone', type: 'objective_error', explanation: '改稿文にない' },
       ],
     };
     const e = parseExplainOutput(JSON.stringify(out), source, revised);
@@ -80,16 +80,16 @@ describe('parseExplainOutput（2段目）', () => {
 
 describe('parseChatOutput（相談）', () => {
   it('改稿案が空、または表示中の案と同じなら改稿なし', () => {
-    expect(parseChatOutput(JSON.stringify({ replyJa: '説明', revisedText: '' }), 'A.')).toEqual({ replyJa: '説明' });
-    expect(parseChatOutput(JSON.stringify({ replyJa: '説明', revisedText: ' A. ' }), 'A.')).toEqual({ replyJa: '説明' });
-    expect(parseChatOutput(JSON.stringify({ replyJa: '直しました', revisedText: 'B.' }), 'A.')).toEqual({
-      replyJa: '直しました',
+    expect(parseChatOutput(JSON.stringify({ reply: '説明', revisedText: '' }), 'A.')).toEqual({ reply: '説明' });
+    expect(parseChatOutput(JSON.stringify({ reply: '説明', revisedText: ' A. ' }), 'A.')).toEqual({ reply: '説明' });
+    expect(parseChatOutput(JSON.stringify({ reply: '直しました', revisedText: 'B.' }), 'A.')).toEqual({
+      reply: '直しました',
       revisedText: 'B.',
     });
   });
 
   it('返答が空ならエラー', () => {
-    expect(() => parseChatOutput(JSON.stringify({ replyJa: ' ', revisedText: 'B.' }), 'A.')).toThrow(
+    expect(() => parseChatOutput(JSON.stringify({ reply: ' ', revisedText: 'B.' }), 'A.')).toThrow(
       InvalidModelOutputError,
     );
   });

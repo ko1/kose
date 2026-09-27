@@ -11,7 +11,7 @@ const change = (before: string, after: string, type: Change['type'] = 'objective
   before,
   after,
   type,
-  explanationJa: `${before} → ${after}`,
+  explanation: `${before} → ${after}`,
 });
 
 function fixture(changes: Change[], opts: Partial<ResultVersion> = {}, session: Partial<ReviewSession> = {}) {
@@ -22,7 +22,7 @@ function fixture(changes: Change[], opts: Partial<ResultVersion> = {}, session: 
     situation: 'casual',
     origin: 'initial',
     createdAt: T0,
-    explanation: { explanationJa: '', changes, nuanceWarnings: [], droppedChanges: 0 },
+    explanation: { explanation: '', changes, nuanceWarnings: [], droppedChanges: 0 },
     ...opts,
   };
   const s: ReviewSession = {
@@ -51,8 +51,8 @@ describe('extractMistakes', () => {
       change('We', 'We', 'uncertain'),
     ]);
     expect(extractMistakes(session, version)).toEqual([
-      { language: 'en', before: 'had went', after: 'went', explanationJa: 'had went → went' },
-      { language: 'en', before: 'back to home', after: 'back home', explanationJa: 'back to home → back home' },
+      { language: 'en', before: 'had went', after: 'went', explanation: 'had went → went' },
+      { language: 'en', before: 'back to home', after: 'back home', explanation: 'back to home → back home' },
     ]);
   });
 
@@ -88,7 +88,7 @@ function args(f: { session: ReviewSession; version: ResultVersion }): [ReviewSes
 describe('mergeMistakes', () => {
   let n = 0;
   const id = () => `c${++n}`;
-  const cand = (before: string, after: string) => ({ language: 'en' as const, before, after, explanationJa: '' });
+  const cand = (before: string, after: string) => ({ language: 'en' as const, before, after, explanation: '' });
 
   it('新しい間違いはカードにし、翌日から復習する', () => {
     const [card] = mergeMistakes([], [cand('had went', 'went')], T0, id);

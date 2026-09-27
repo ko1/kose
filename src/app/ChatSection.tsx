@@ -1,6 +1,7 @@
 import { KeyboardEvent, useState } from 'react';
 import { formatCost } from '../ai/pricing';
 import type { ReviewSession } from '../domain/types';
+import { M } from '../shared/messages';
 import type { ChatState } from './controller';
 
 interface Props {
@@ -39,11 +40,9 @@ export function ChatSection({ session, state, disabled, external, onSend, onRetr
 
   return (
     <section className="section chat">
-      <h2>ニュアンスを相談</h2>
+      <h2>{M.chat.heading}</h2>
       {session.messages.length === 0 && !running && (
-        <p className="note">
-          例:「もっと苦労して帰宅したニュアンスにしたい」「〜と〜の違いは？」。書き換えを頼むと新しい案が作られます。
-        </p>
+        <p className="note">{M.chat.examples}</p>
       )}
       <ul className="messages">
         {session.messages.map((m, i) => (
@@ -53,10 +52,10 @@ export function ChatSection({ session, state, disabled, external, onSend, onRetr
               <p className="message-meta">
                 {m.versionId &&
                   (session.currentVersionId === m.versionId ? (
-                    <span className="version-updated">↑ RESULT を案 {versionNumber(m.versionId)} に更新しました</span>
+                    <span className="version-updated">{M.chat.updated(versionNumber(m.versionId))}</span>
                   ) : (
                     <button className="link" onClick={() => onSelectVersion(m.versionId!)}>
-                      ↑ 案 {versionNumber(m.versionId)} を RESULT に表示
+                      {M.chat.showVersion(versionNumber(m.versionId))}
                     </button>
                   ))}
                 {formatCost(m.usage) && <span className="meta">{formatCost(m.usage)}</span>}
@@ -73,7 +72,7 @@ export function ChatSection({ session, state, disabled, external, onSend, onRetr
               </p>
             ) : (
               <p className="note">
-                <span className="spinner" aria-hidden /> 考えています…
+                <span className="spinner" aria-hidden /> {M.chat.thinking}
               </p>
             )}
           </li>
@@ -82,23 +81,23 @@ export function ChatSection({ session, state, disabled, external, onSend, onRetr
       {state?.kind === 'error' && (
         <div className="status error" role="alert">
           <p>{state.message}</p>
-          <button onClick={onRetry}>送り直す</button>
+          <button onClick={onRetry}>{M.chat.resend}</button>
         </div>
       )}
       <div className="chat-input">
         <textarea
           value={draft}
           rows={2}
-          placeholder={disabled ? '改稿が終わると相談できます' : '相談したいこと（Enterで送信、Shift+Enterで改行）'}
+          placeholder={disabled ? M.chat.placeholderDisabled : M.chat.placeholder}
           disabled={disabled}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={onKeyDown}
         />
         <button className="primary" onClick={send} disabled={!canSend}>
-          送信
+          {M.chat.send}
         </button>
       </div>
-      {external && <p className="note">相談の内容と原文・改稿案がAIに送信されます。</p>}
+      {external && <p className="note">{M.chat.externalNote}</p>}
     </section>
   );
 }

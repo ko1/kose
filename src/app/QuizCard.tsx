@@ -1,13 +1,8 @@
 import { useState } from 'react';
-import { LANGUAGE_LABELS } from '../domain/labels';
 import { RATINGS, type MistakeCard, type Rating } from '../domain/types';
+import { M } from '../shared/messages';
 
-export const RATING_LABELS: Record<Rating, string> = {
-  again: 'もう一度',
-  hard: '難しい',
-  good: 'できた',
-  easy: '簡単',
-};
+export const RATING_LABELS: Record<Rating, string> = M.quiz.ratings;
 
 /**
  * 1枚分の復習クイズ。間違えた表現を見て直し方を考え、答えを見て自己評価する。
@@ -30,8 +25,8 @@ export function QuizCard({
   return (
     <div className="quiz">
       <p className="quiz-prompt">
-        {LANGUAGE_LABELS[card.language].name}の誤りを直してください
-        {card.count > 1 && <span className="meta">（{card.count}回目の間違い）</span>}
+        {M.quiz.prompt(M.languages[card.language].name)}
+        {card.count > 1 && <span className="meta">{M.quiz.times(card.count)}</span>}
       </p>
       <p className="quiz-before">
         <del>{card.before}</del>
@@ -43,19 +38,19 @@ export function QuizCard({
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.nativeEvent.isComposing) setRevealed(true);
         }}
-        placeholder="直した表現（入力しなくても大丈夫です）"
-        aria-label="直した表現"
+        placeholder={M.quiz.inputPlaceholder}
+        aria-label={M.quiz.inputLabel}
       />
       {!revealed ? (
-        <button onClick={() => setRevealed(true)}>答えを見る</button>
+        <button onClick={() => setRevealed(true)}>{M.quiz.reveal}</button>
       ) : (
         <>
           <p className="quiz-after">
             <ins>{card.after}</ins>
           </p>
-          {card.explanationJa && <p className="change-explanation">{card.explanationJa}</p>}
+          {card.explanation && <p className="change-explanation">{card.explanation}</p>}
           {rated === null ? (
-            <div className="ratings" role="group" aria-label="自己評価">
+            <div className="ratings" role="group" aria-label={M.quiz.ratingsLabel}>
               {RATINGS.map((r) => (
                 <button
                   key={r}
@@ -70,11 +65,11 @@ export function QuizCard({
             </div>
           ) : (
             <p className="note">
-              「{RATING_LABELS[rated]}」で記録しました。
+              {M.quiz.recorded(RATING_LABELS[rated])}
               {onNext && (
                 <>
                   {' '}
-                  <button onClick={onNext}>次へ</button>
+                  <button onClick={onNext}>{M.quiz.next}</button>
                 </>
               )}
             </p>

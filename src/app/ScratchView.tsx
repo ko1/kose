@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { countChars } from '../domain/text';
+import { M } from '../shared/messages';
 
 /**
  * 自由入力（emacs の *scratch* のような欄）。ページで選択しなくても、ここに書いて kose にかけられる。
@@ -31,8 +32,8 @@ export function ScratchView({
   return (
     <section className="section scratch">
       <div className="section-head">
-        <h2>自由入力</h2>
-        <span className="meta">{countChars(draft)}字</span>
+        <h2>{M.scratch.heading}</h2>
+        <span className="meta">{M.scratch.chars(countChars(draft))}</span>
       </div>
       <textarea
         ref={ref}
@@ -44,21 +45,21 @@ export function ScratchView({
             if (canRun) onRun();
           }
         }}
-        placeholder="ここに文章を書いて、Ctrl+Enter で kose にかけます"
-        aria-label="自由入力"
+        placeholder={M.scratch.placeholder}
+        aria-label={M.scratch.label}
         rows={6}
       />
       <div className="scratch-actions">
-        <span className="note">Ctrl+Enter で実行。下書きはブラウザを閉じるまで残ります。</span>
+        <span className="note">{M.scratch.hint}</span>
         <button className="primary" disabled={!canRun} onClick={onRun}>
-          kose にかける
+          {M.scratch.run}
         </button>
       </div>
       {!hasOtherSessions && (
         <div className="empty">
-          <p>Webページで文章を選択し、右クリック →「kose」、ツールバーの kose ボタン、または Alt+K でも実行できます。</p>
-          <p>最後に選んだ機能（よい日本語にする／よい英語にする）で実行します。上の「機能」を切り替えて「変更」を押すと作り直せます。</p>
-          <p>タブごとにレビューが保持され、ブラウザでタブを切り替えると表示も切り替わります。</p>
+          {M.scratch.usage.map((line) => (
+            <p key={line}>{line}</p>
+          ))}
         </div>
       )}
     </section>

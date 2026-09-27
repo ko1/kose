@@ -9,6 +9,8 @@ import type {
   RewriteResult,
 } from '../domain/types';
 import { appendChunk, distinct, extractPartialExplanation, extractPartialStringField } from './partialJson';
+import { uiLanguage } from '../shared/locale';
+import { M } from '../shared/messages';
 import {
   buildChatSystemPrompt,
   buildExplainPrompt,
@@ -33,9 +35,19 @@ function api(): LanguageModelStatic | undefined {
   return globalThis.LanguageModel;
 }
 
-/** 解説は常に日本語なので、出力言語には常に ja を含める */
-export function languageOptions(targetLanguage: LanguageCode): LanguageModelOptions {
-  const outputs = targetLanguage === 'ja' ? ['ja'] : [targetLanguage, 'ja'];
+/** Chrome内蔵AIが出力できる言語。解説の言語がこれ以外なら英語で書かせる */
+export const BUILTIN_OUTPUT_LANGUAGES = ['en', 'ja', 'es'];
+
+export function builtinExplanationLanguage(code: string = uiLanguage()): string {
+  return BUILTIN_OUTPUT_LANGUAGES.includes(code) ? code : 'en';
+}
+
+/** 出力言語には改稿の言語と、解説の言語（ブラウザの言語）を含める */
+export function languageOptions(
+  targetLanguage: LanguageCode,
+  explanationLanguage: string = builtinExplanationLanguage(),
+): LanguageModelOptions {
+  const outputs = [...new Set([targetLanguage, explanationLanguage])];
   return {
     expectedInputs: [{ type: 'text', languages: ['ja', 'en'] }],
     expectedOutputs: [{ type: 'text', languages: outputs }],
@@ -44,7 +56,7 @@ export function languageOptions(targetLanguage: LanguageCode): LanguageModelOpti
 
 export class BuiltinProvider implements AIProvider {
   readonly id = 'builtin' as const;
-  readonly label = 'ローカル（Chrome内蔵AI）';
+  readonly label = M.options.builtin;
   readonly sendsExternally = false;
 
   async availability(targetLanguage: LanguageCode): Promise<ProviderAvailability> {
@@ -52,14 +64,14 @@ export class BuiltinProvider implements AIProvider {
     if (!lm) {
       return {
         kind: 'unavailable',
-        reason: 'このChromeではBuilt-in AI（Prompt API）が利用できません。Chromeのバージョンと動作要件を確認してください。',
+        reason: M.errors.builtinUnavailable,
       };
     }
     let state: LanguageModelAvailability;
     try {
       state = await lm.availability(languageOptions(targetLanguage));
     } catch (e) {
-      return { kind: 'unavailable', reason: `Built-in AIの利用可否を確認できませんでした: ${errorMessage(e)}` };
+      return { kind: 'unavailable', reason: M.errors.builtinCheckFailed(errorMessage(e)) };
     }
     switch (state) {
       case 'available':
@@ -72,14 +84,14 @@ export class BuiltinProvider implements AIProvider {
         return {
           kind: 'unavailable',
           reason:
-            'この環境・言語の組み合わせではChrome内蔵AIを利用できません（ハードウェア要件、空き容量、対応言語などが原因の可能性があります）。',
+            M.errors.builtinUnsupported,
         };
     }
   }
 
   async prepare(targetLanguage: LanguageCode, onProgress: (ratio: number) => void): Promise<void> {
     const lm = api();
-    if (!lm) throw new ProviderError('Built-in AIが利用できません。');
+    if (!lm) throw new ProviderError(M.errors.builtinMissing);
     const session = await lm.create({
       ...languageOptions(targetLanguage),
       monitor(m) {
@@ -146,7 +158,8 @@ export class BuiltinProvider implements AIProvider {
     onPartial?: (partial: PartialExplanation) => void,
   ): Promise<Explanation> {
     const lm = requireApi();
-    const session = await forkSession(lm, 'explain', request.targetLanguage, signal);
+    request = { ...request, explanationLanguage: builtinExplanationLanguage(request.explanationLanguage) };
+    const session = await forkSession(lm, 'explain', request.targetLanguage, signal, request.explanationLanguage);
     try {
       const input = buildExplainPrompt(request);
       const options = { responseConstraint: explainJsonSchema(request.reviewStructure), signal };
@@ -164,8 +177,9 @@ export class BuiltinProvider implements AIProvider {
     }
   }
 
-  async chat(request: ChatRequest, signal?: AbortSignal, onPartial?: (replyJa: string) => void): Promise<ChatReply> {
+  async chat(request: ChatRequest, signal?: AbortSignal, onPartial?: (reply: string) => void): Promise<ChatReply> {
     const lm = requireApi();
+    request = { ...request, explanationLanguage: builtinExplanationLanguage(request.explanationLanguage) };
     const system = buildChatSystemPrompt(request);
     const messages = chatHistoryMessages(request);
     const message = messages.pop()!;
@@ -173,7 +187,7 @@ export class BuiltinProvider implements AIProvider {
     // コンテキストが小さいので、入りきらなければ古い発言から削る（原文・表示中の案・今回の発言は必ず残す）
     for (;;) {
       const session = await lm.create({
-        ...languageOptions(request.targetLanguage),
+        ...languageOptions(request.targetLanguage, request.explanationLanguage),
         initialPrompts: [{ role: 'system', content: system }, ...history],
         signal,
       });
@@ -181,7 +195,7 @@ export class BuiltinProvider implements AIProvider {
         const options = { responseConstraint: chatJsonSchema(), signal };
         if (!(await fitsInContext(session, message.content, options))) {
           if (history.length === 0) {
-            throw new ProviderError('相談の内容が長すぎて、Chrome内蔵AIでは処理できません。');
+            throw new ProviderError(M.errors.chatTooLong);
           }
           history = history.slice(2); // user と assistant の1往復ずつ削る
           continue;
@@ -190,7 +204,7 @@ export class BuiltinProvider implements AIProvider {
         const raw =
           notify && session.promptStreaming
             ? await readStream(session.promptStreaming(message.content, options), (text) => {
-                const partial = extractPartialStringField(text, 'replyJa');
+                const partial = extractPartialStringField(text, 'reply');
                 if (partial !== null) notify(partial);
               })
             : await session.prompt(message.content, options);
@@ -204,7 +218,7 @@ export class BuiltinProvider implements AIProvider {
 
 function requireApi(): LanguageModelStatic {
   const lm = api();
-  if (!lm) throw new ProviderError('Built-in AIが利用できません。');
+  if (!lm) throw new ProviderError(M.errors.builtinMissing);
   return lm;
 }
 
@@ -213,15 +227,30 @@ type SessionKind = 'rewrite' | 'explain';
 /** システムプロンプト（と手本）だけを読み込んだセッション。段・出力言語ごとに1つ保持し、直接 prompt はしない */
 const baseSessions = new Map<string, Promise<LanguageModelSession>>();
 
-function createSession(lm: LanguageModelStatic, kind: SessionKind, targetLanguage: LanguageCode, signal?: AbortSignal) {
-  return lm.create({ ...languageOptions(targetLanguage), initialPrompts: initialMessages(kind), signal });
+function createSession(
+  lm: LanguageModelStatic,
+  kind: SessionKind,
+  targetLanguage: LanguageCode,
+  explanationLanguage: string,
+  signal?: AbortSignal,
+) {
+  return lm.create({
+    ...languageOptions(targetLanguage, explanationLanguage),
+    initialPrompts: initialMessages(kind),
+    signal,
+  });
 }
 
-function baseSession(lm: LanguageModelStatic, kind: SessionKind, targetLanguage: LanguageCode): Promise<LanguageModelSession> {
-  const key = `${kind}:${targetLanguage}`;
+function baseSession(
+  lm: LanguageModelStatic,
+  kind: SessionKind,
+  targetLanguage: LanguageCode,
+  explanationLanguage: string = builtinExplanationLanguage(),
+): Promise<LanguageModelSession> {
+  const key = `${kind}:${targetLanguage}:${explanationLanguage}`;
   let base = baseSessions.get(key);
   if (!base) {
-    base = createSession(lm, kind, targetLanguage);
+    base = createSession(lm, kind, targetLanguage, explanationLanguage);
     baseSessions.set(key, base);
     base.catch(() => baseSessions.delete(key));
   }
@@ -233,17 +262,18 @@ async function forkSession(
   kind: SessionKind,
   targetLanguage: LanguageCode,
   signal?: AbortSignal,
+  explanationLanguage: string = builtinExplanationLanguage(),
 ): Promise<LanguageModelSession> {
-  const base = await baseSession(lm, kind, targetLanguage);
-  if (!base.clone) return createSession(lm, kind, targetLanguage, signal);
+  const base = await baseSession(lm, kind, targetLanguage, explanationLanguage);
+  if (!base.clone) return createSession(lm, kind, targetLanguage, explanationLanguage, signal);
   try {
     return await base.clone({ signal });
   } catch (e) {
     if (signal?.aborted) throw e;
     // 保持していたセッションが使えなくなっていたら作り直す
-    baseSessions.delete(`${kind}:${targetLanguage}`);
+    baseSessions.delete(`${kind}:${targetLanguage}:${explanationLanguage}`);
     base.destroy();
-    const fresh = await baseSession(lm, kind, targetLanguage);
+    const fresh = await baseSession(lm, kind, targetLanguage, explanationLanguage);
     return fresh.clone!({ signal });
   }
 }

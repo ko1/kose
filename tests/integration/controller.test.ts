@@ -59,8 +59,8 @@ class FakeProvider implements AIProvider {
       signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
     });
   }
-  answerExplain(index: number, explanationJa: string) {
-    this.explainCalls[index].resolve({ explanationJa, changes: [], nuanceWarnings: [], droppedChanges: 0 });
+  answerExplain(index: number, explanation: string) {
+    this.explainCalls[index].resolve({ explanation, changes: [], nuanceWarnings: [], droppedChanges: 0 });
   }
   async prepare(_target: string, onProgress: (ratio: number) => void) {
     this.prepared++;
@@ -139,11 +139,11 @@ describe('KoseController', () => {
     const versionId = snap().displayed!.currentVersionId!;
     expect(snap().explainStates[versionId]?.kind).toBe('running');
     // 生成途中の解説を公開する
-    provider.explainCalls[0].onPartial?.({ explanationJa: '解説で' });
-    expect(snap().explainStates[versionId]).toMatchObject({ kind: 'running', partial: { explanationJa: '解説で' } });
+    provider.explainCalls[0].onPartial?.({ explanation: '解説で' });
+    expect(snap().explainStates[versionId]).toMatchObject({ kind: 'running', partial: { explanation: '解説で' } });
     provider.answerExplain(0, '解説です');
     await flush();
-    expect(snap().displayed?.versions[0].explanation).toMatchObject({ explanationJa: '解説です', provider: 'builtin' });
+    expect(snap().displayed?.versions[0].explanation).toMatchObject({ explanation: '解説です', provider: 'builtin' });
     expect(snap().explainStates[versionId]).toBeUndefined();
   });
 
@@ -179,7 +179,7 @@ describe('KoseController', () => {
     expect(provider.explainCalls).toHaveLength(1);
     provider.answerExplain(0, 'ok');
     await done;
-    expect(snap().displayed?.versions[0].explanation?.explanationJa).toBe('ok');
+    expect(snap().displayed?.versions[0].explanation?.explanation).toBe('ok');
     // 生成済みなら問い合わせない
     await controller.explain(1);
     expect(provider.explainCalls).toHaveLength(1);
@@ -212,7 +212,7 @@ describe('KoseController', () => {
     await flush();
     provider.answerExplain(1, 'ok');
     await retry;
-    expect(snap().displayed?.versions[0].explanation?.explanationJa).toBe('ok');
+    expect(snap().displayed?.versions[0].explanation?.explanation).toBe('ok');
   });
 
   it('同じタブの新しい右クリックで、前のレビューの解説生成を止める', async () => {
@@ -254,7 +254,7 @@ describe('KoseController', () => {
       call.onPartial?.('苦労');
       expect(snap().chatState).toMatchObject({ kind: 'running', partial: '苦労' });
 
-      call.resolve({ replyJa: '苦労のニュアンスを加えました。', revisedText: 'I finally made it home.' });
+      call.resolve({ reply: '苦労のニュアンスを加えました。', revisedText: 'I finally made it home.' });
       await sent;
       const s = snap().displayed!;
       expect(s.versions.map((v) => v.origin)).toEqual(['initial', 'chat']);
@@ -276,7 +276,7 @@ describe('KoseController', () => {
       const { provider, controller, snap } = await reviewed();
       const sent = controller.sendChat(1, 'went と got の違いは？');
       await flush();
-      provider.chatCalls[0].resolve({ replyJa: 'got は到着の過程を含みます。' });
+      provider.chatCalls[0].resolve({ reply: 'got は到着の過程を含みます。' });
       await sent;
       expect(snap().displayed!.versions).toHaveLength(1);
 
@@ -292,7 +292,7 @@ describe('KoseController', () => {
       const { provider, controller } = await reviewed();
       const sent = controller.sendChat(1, '質問1');
       await flush();
-      provider.chatCalls[0].resolve({ replyJa: '回答1' });
+      provider.chatCalls[0].resolve({ reply: '回答1' });
       await sent;
 
       // 別のタブ
@@ -337,7 +337,7 @@ describe('KoseController', () => {
       void controller.retryChat(1);
       await flush();
       expect(provider.chatCalls[1].request).toMatchObject({ message: '質問', history: [] });
-      provider.chatCalls[1].resolve({ replyJa: '回答' });
+      provider.chatCalls[1].resolve({ reply: '回答' });
       await flush();
       expect(snap().displayed!.messages.map((m) => m.content)).toEqual(['質問', '回答']);
     });
@@ -471,7 +471,7 @@ describe('KoseController', () => {
     const { snap } = await setup({ factory: createProvider });
     await putPending(pending(1));
     await flush();
-    expect(snap().displayed?.status).toMatchObject({ kind: 'error', message: expect.stringMatching(/APIキー/) });
+    expect(snap().displayed?.status).toMatchObject({ kind: 'error', message: expect.stringMatching(/API key/) });
     expect(fetchSpy).not.toHaveBeenCalled();
     fetchSpy.mockRestore();
   });
@@ -615,10 +615,10 @@ describe('KoseController', () => {
       provider.calls.at(-1)!.resolve({ revisedText: REVISED, detectedSourceLanguage: 'en' });
       await flush();
       provider.explainCalls.at(-1)!.resolve({
-        explanationJa: '',
+        explanation: '',
         changes: [
-          { before: 'had went', after: 'went', type: 'objective_error', explanationJa: '過去完了は不要' },
-          { before: 'finally', after: 'finally', type: 'style', explanationJa: '' },
+          { before: 'had went', after: 'went', type: 'objective_error', explanation: '過去完了は不要' },
+          { before: 'finally', after: 'finally', type: 'style', explanation: '' },
         ],
         nuanceWarnings: [],
         droppedChanges: 0,
@@ -648,8 +648,8 @@ describe('KoseController', () => {
     it('新しい実行で期限が来たカードを1枚出し、タブごとに別のカードにする。評価すると期限が延びる', async () => {
       await saveMistakes(
         [
-          { language: 'en', before: 'old', after: 'new', explanationJa: '' },
-          { language: 'en', before: 'old2', after: 'new2', explanationJa: '' },
+          { language: 'en', before: 'old', after: 'new', explanation: '' },
+          { language: 'en', before: 'old2', after: 'new2', explanation: '' },
         ],
         Date.now() - 2 * DAY,
       );
@@ -674,13 +674,13 @@ describe('KoseController', () => {
     });
 
     it('期限が来たカードがない、または設定でオフなら出さない', async () => {
-      await saveMistakes([{ language: 'en', before: 'old', after: 'new', explanationJa: '' }], Date.now());
+      await saveMistakes([{ language: 'en', before: 'old', after: 'new', explanation: '' }], Date.now());
       const { snap, controller } = await setup();
       await putPending(pending(1));
       await flush();
       expect(snap().quizCard).toBeNull();
 
-      await saveMistakes([{ language: 'en', before: 'a', after: 'b', explanationJa: '' }], Date.now() - 2 * DAY);
+      await saveMistakes([{ language: 'en', before: 'a', after: 'b', explanation: '' }], Date.now() - 2 * DAY);
       await controller.updateSettings({ quizWhileWaiting: false });
       await putPending(pending(1));
       await flush();
@@ -715,7 +715,7 @@ describe('KoseController', () => {
       await flush();
       expect(provider.calls[0].request).toMatchObject({ sourceText: '  Hello wrld.', targetLanguage: 'ja' });
       expect(snap().displayedTabId).toBe(SCRATCH_TAB_ID);
-      expect(snap().displayed?.source).toMatchObject({ tabId: SCRATCH_TAB_ID, tabTitle: '自由入力' });
+      expect(snap().displayed?.source).toMatchObject({ tabId: SCRATCH_TAB_ID, tabTitle: 'Free input' });
       expect(snap().scratch.draft).toBe('\n  Hello wrld.\n\n');
 
       provider.answer(0, 'Hello world.');

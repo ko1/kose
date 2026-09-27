@@ -44,7 +44,7 @@ export interface AIProvider {
   /** モデルのダウンロードなど。ユーザー操作（クリック）の中で呼ぶこと */
   prepare?(targetLanguage: LanguageCode, onProgress: (ratio: number) => void): Promise<void>;
   /** ニュアンス相談。onPartial: 生成途中の返答（対応するプロバイダーのみ呼ぶ） */
-  chat(request: ChatRequest, signal?: AbortSignal, onPartial?: (replyJa: string) => void): Promise<ChatReply>;
+  chat(request: ChatRequest, signal?: AbortSignal, onPartial?: (reply: string) => void): Promise<ChatReply>;
 }
 
 export class ProviderError extends Error {

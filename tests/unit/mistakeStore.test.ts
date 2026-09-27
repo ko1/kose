@@ -13,7 +13,7 @@ import {
 import { fakeChrome } from '../fakeChrome';
 
 const T0 = Date.UTC(2026, 0, 1);
-const cand = (before: string, after: string) => ({ language: 'en' as const, before, after, explanationJa: '説明' });
+const cand = (before: string, after: string) => ({ language: 'en' as const, before, after, explanation: '説明' });
 
 describe('mistakeStore', () => {
   it('保存・評価・削除・全削除ができ、同時に呼んでも取りこぼさない', async () => {
@@ -35,8 +35,19 @@ describe('mistakeStore', () => {
     await saveMistakes([cand('had went', 'went')], T0);
     const stored = fakeChrome().storage.local.data.mistakes as Record<string, unknown>[];
     expect(Object.keys(stored[0]).sort()).toEqual(
-      ['id', 'key', 'language', 'before', 'after', 'explanationJa', 'createdAt', 'lastSeenAt', 'count', 'review'].sort(),
+      ['id', 'key', 'language', 'before', 'after', 'explanation', 'createdAt', 'lastSeenAt', 'count', 'review'].sort(),
     );
+  });
+
+  it('解説の項目名が explanationJa だった頃のカードも読む', async () => {
+    await saveMistakes([cand('a', 'b')], T0);
+    const c = fakeChrome();
+    const [card] = c.storage.local.data.mistakes as Record<string, unknown>[];
+    const { explanation, ...rest } = card;
+    c.storage.local.data.mistakes = [{ ...rest, explanationJa: explanation }];
+    const [loaded] = await loadMistakes();
+    expect(loaded.explanation).toBe(explanation);
+    expect('explanationJa' in loaded).toBe(false);
   });
 
   it('壊れた項目は読み飛ばす', async () => {
@@ -63,7 +74,7 @@ describe('mistakeStore', () => {
     await saveMistakes([cand('A', 'b')], T0);
     expect(await importMistakes(json)).toBe(1);
     expect((await loadMistakes()).map((c) => c.before).sort()).toEqual(['A', 'c']);
-    await expect(importMistakes('{"cards": []}')).rejects.toThrow('書き出しファイルではありません');
+    await expect(importMistakes('{"cards": []}')).rejects.toThrow('not a kose mistake notes export');
     await expect(importMistakes('not json')).rejects.toThrow();
   });
 });

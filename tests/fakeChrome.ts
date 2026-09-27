@@ -154,6 +154,10 @@ export function createFakeChrome() {
         return true;
       },
     },
+    i18n: {
+      uiLanguage: 'en',
+      getUILanguage: () => fake.i18n.uiLanguage,
+    },
     action: {
       title: undefined as string | undefined,
       onClicked: new FakeEvent<[unknown]>(),

@@ -1,0 +1,4 @@
+{
+  "description": { "message": "Improves the text you select into good Japanese or good English." },
+  "commandRun": { "message": "Run kose on the selected text with the last chosen mode" }
+}

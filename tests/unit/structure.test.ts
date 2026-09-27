@@ -15,7 +15,7 @@ describe('structure', () => {
 
   it('構成の指摘を添えた依頼文を作る', () => {
     expect(structureApplyMessage([{ problem: '結論が最後', suggestion: '冒頭へ' }])).toBe(
-      '次の構成の指摘を反映して、構成を直した案を作ってください。\n\n1. 結論が最後 → 冒頭へ',
+      'Apply the following structure suggestions and create a restructured version.\n\n1. 結論が最後 → 冒頭へ',
     );
   });
 });

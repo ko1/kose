@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { BuiltinProvider, languageOptions } from '../../src/ai/builtinProvider';
+import { BuiltinProvider, builtinExplanationLanguage, languageOptions } from '../../src/ai/builtinProvider';
 import { createProvider } from '../../src/ai/factory';
 import { OPENAI_ORIGIN, OpenAIProvider } from '../../src/ai/openaiProvider';
 import { DEFAULT_SETTINGS } from '../../src/storage/settings';
@@ -7,17 +7,18 @@ import { fakeChrome } from '../fakeChrome';
 
 const output = JSON.stringify({ revisedText: 'Hello.', detectedSourceLanguage: 'ja' });
 const explainOutput = JSON.stringify({
-  explanationJa: '挨拶を英訳しました。',
-  changes: [{ before: 'こんにちは', after: 'Hello', type: 'style', explanationJa: '一般的な挨拶' }],
+  explanation: '挨拶を英訳しました。',
+  changes: [{ before: 'こんにちは', after: 'Hello', type: 'style', explanation: '一般的な挨拶' }],
   nuanceWarnings: [],
 });
-const request = { requestId: 'r', sourceText: 'こんにちは。', targetLanguage: 'en' as const, situation: 'casual' as const };
+const request = { requestId: 'r', sourceText: 'こんにちは。', targetLanguage: 'en' as const, situation: 'casual' as const, explanationLanguage: 'ja' };
 const explainRequest = { ...request, revisedText: 'Hello.', reviewStructure: false };
 const chatRequest = {
   requestId: 'c',
   sourceText: 'こんにちは。',
   targetLanguage: 'en' as const,
   situation: 'casual' as const,
+  explanationLanguage: 'ja',
   currentRevisedText: 'Hello.',
   previousRevisedTexts: ['Hello.'],
   history: [
@@ -28,7 +29,7 @@ const chatRequest = {
   ],
   message: 'もっとくだけて',
 };
-const chatOutput = JSON.stringify({ replyJa: 'くだけました', revisedText: 'Hi!' });
+const chatOutput = JSON.stringify({ reply: 'くだけました', revisedText: 'Hi!' });
 
 function installLanguageModel(state: LanguageModelAvailability, prompt = vi.fn(async () => output)) {
   const lm = {
@@ -40,9 +41,17 @@ function installLanguageModel(state: LanguageModelAvailability, prompt = vi.fn(a
 }
 
 describe('BuiltinProvider', () => {
-  it('解説が日本語なので出力言語に常に ja を含める', () => {
-    expect(languageOptions('en').expectedOutputs?.[0].languages).toEqual(['en', 'ja']);
-    expect(languageOptions('ja').expectedOutputs?.[0].languages).toEqual(['ja']);
+  it('出力言語には改稿の言語と解説の言語（ブラウザの言語）を含める', () => {
+    expect(languageOptions('en', 'ja').expectedOutputs?.[0].languages).toEqual(['en', 'ja']);
+    expect(languageOptions('ja', 'ja').expectedOutputs?.[0].languages).toEqual(['ja']);
+    // テストでは UI 言語が英語
+    expect(languageOptions('ja').expectedOutputs?.[0].languages).toEqual(['ja', 'en']);
+  });
+
+  it('内蔵AIが出力できない言語の解説は英語にする', () => {
+    expect(builtinExplanationLanguage('ja')).toBe('ja');
+    expect(builtinExplanationLanguage('es')).toBe('es');
+    expect(builtinExplanationLanguage('fr')).toBe('en');
   });
 
   it('Prompt API が無い環境では利用不可と理由を返す', async () => {
@@ -154,7 +163,7 @@ describe('BuiltinProvider', () => {
     };
     (globalThis as { LanguageModel?: unknown }).LanguageModel = lm;
     const r = await new BuiltinProvider().chat(chatRequest);
-    expect(r).toEqual({ replyJa: 'くだけました', revisedText: 'Hi!' });
+    expect(r).toEqual({ reply: 'くだけました', revisedText: 'Hi!' });
     // system + 4発言(=100) → system + 2発言(=60) で収まる
     expect(created.map((c) => c.initialPrompts.length)).toEqual([5, 3]);
   });
@@ -213,7 +222,7 @@ describe('OpenAIProvider', () => {
       new Response(JSON.stringify({ choices: [{ message: { content: explainOutput } }] }), { status: 200 }),
     );
     const e = await new OpenAIProvider(config, fetchImpl).explain(explainRequest);
-    expect(e.explanationJa).toBe('挨拶を英訳しました。');
+    expect(e.explanation).toBe('挨拶を英訳しました。');
     const body = JSON.parse((fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
     expect(body.response_format.json_schema.name).toBe('explanation');
     expect(body.messages.map((m: { role: string }) => m.role)).toEqual(['system', 'user', 'assistant', 'user']);
@@ -231,7 +240,7 @@ describe('OpenAIProvider', () => {
 
   it('401 はAPIキーの問題として報告する', async () => {
     const fetchImpl = vi.fn(async () => new Response('{}', { status: 401 }));
-    await expect(new OpenAIProvider(config, fetchImpl).rewrite(request)).rejects.toThrow(/APIキーが無効/);
+    await expect(new OpenAIProvider(config, fetchImpl).rewrite(request)).rejects.toThrow(/API key is invalid/);
   });
 
   it('入力の文字数上限', async () => {

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { formatCost } from '../ai/pricing';
 import { diffTexts } from '../domain/diff';
-import { LANGUAGE_LABELS, SITUATION_LABELS } from '../domain/labels';
 import { currentVersion } from '../domain/session';
 import { countChars } from '../domain/text';
 import { structureApplyMessage } from '../domain/structure';
@@ -14,6 +13,7 @@ import type {
   ReviewSession,
   StructureReview,
 } from '../domain/types';
+import { M } from '../shared/messages';
 import { ChatSection } from './ChatSection';
 import { QuizCard } from './QuizCard';
 import type { ChatState, DownloadState, ExplainState } from './controller';
@@ -65,12 +65,12 @@ export function ReviewView({
     <>
       <section className="section">
         <div className="section-head">
-          <h2>ORIGINAL</h2>
-          <span className="meta">{countChars(session.sourceText)}字</span>
+          <h2>{M.review.original}</h2>
+          <span className="meta">{M.review.chars(countChars(session.sourceText))}</span>
         </div>
         <p className="text original">{session.sourceText}</p>
         {session.source.textSource === 'selectionText' && (
-          <p className="note">このページでは選択範囲を直接読み取れなかったため、改行が失われている可能性があります。</p>
+          <p className="note">{M.review.selectionTextNote}</p>
         )}
       </section>
 
@@ -83,8 +83,8 @@ export function ReviewView({
       {streaming && (
         <section className="section">
           <div className="section-head">
-            <h2>RESULT</h2>
-            <span className="meta">生成中…</span>
+            <h2>{M.review.result}</h2>
+            <span className="meta">{M.review.generating}</span>
           </div>
           <div className="result-box">
             <p className="text result">
@@ -92,7 +92,7 @@ export function ReviewView({
               <span className="caret" aria-hidden />
             </p>
           </div>
-          <p className="note">改稿文のあとに、解説と変更点を生成しています。</p>
+          <p className="note">{M.review.generatingNote}</p>
         </section>
       )}
 
@@ -124,7 +124,7 @@ export function ReviewView({
         </>
       )}
 
-      <CopyButton className="link debug-copy" label="デバッグ用にJSONをコピー" getText={debugJson} />
+      <CopyButton className="link debug-copy" label={M.review.debugCopy} getText={debugJson} />
     </>
   );
 }
@@ -138,7 +138,7 @@ function WaitingQuiz({ card, waiting, onRate }: { card: MistakeCard; waiting: bo
   return (
     <details className="section quiz-panel" open={open} onToggle={(e) => setOpen(e.currentTarget.open)}>
       <summary>
-        <h2>待ち時間に復習</h2>
+        <h2>{M.review.waitingQuiz}</h2>
         {!open && <span className="meta"> {card.before}</span>}
       </summary>
       <QuizCard card={card} onRate={onRate} />
@@ -155,7 +155,7 @@ function CopyButton({ label, getText, className }: { label: string; getText: () 
   };
   return (
     <button className={className} onClick={copy}>
-      {copied ? 'Copied' : label}
+      {copied ? M.review.copied : label}
     </button>
   );
 }
@@ -171,47 +171,47 @@ function StatusPanel({
     case 'running':
       return (
         <div className="status" role="status">
-          <span className="spinner" aria-hidden /> {LANGUAGE_LABELS[session.targetLanguage].target}
-          （{SITUATION_LABELS[session.situation].name}）にしています… <Elapsed since={status.startedAt} />
+          <span className="spinner" aria-hidden />{' '}
+          {M.review.running(M.languages[session.targetLanguage].target, M.situations[session.situation])}{' '}
+          <Elapsed since={status.startedAt} />
         </div>
       );
     case 'error':
       return (
         <div className="status error" role="alert">
           <p>{status.message}</p>
-          <button onClick={onRetry}>再実行</button>
+          <button onClick={onRetry}>{M.review.retry}</button>
         </div>
       );
     case 'interrupted':
       return (
         <div className="status warn">
-          <p>処理が中断されました。</p>
-          <button onClick={onRetry}>再実行</button>
+          <p>{M.review.interrupted}</p>
+          <button onClick={onRetry}>{M.review.retry}</button>
         </div>
       );
     case 'too-long':
       return (
         <div className="status error" role="alert">
-          <p>文章が長すぎるため実行しませんでした（上限: {status.limit.toLocaleString()}）。選択範囲を短くしてください。</p>
+          <p>{M.review.tooLong(status.limit.toLocaleString())}</p>
         </div>
       );
     case 'needs-download':
       return (
         <div className="status warn">
           <p>
-            {status.inProgress
-              ? 'Chromeが内蔵AIのモデルをダウンロード中です。'
-              : 'Chrome内蔵AIのモデルがまだダウンロードされていません。初回のみダウンロードが必要です（数GBあるため時間がかかります）。'}
+            {status.inProgress ? M.review.downloadInProgress : M.review.downloadNeeded}
           </p>
           {download === null ? (
-            <button onClick={onDownload}>{status.inProgress ? '進捗を表示して待つ' : 'モデルをダウンロード'}</button>
+            <button onClick={onDownload}>{status.inProgress ? M.review.downloadWait : M.review.downloadStart}</button>
           ) : (
             <DownloadProgress download={download} />
           )}
           <p className="note">
-            詳しい状況は <code>chrome://on-device-internals</code> の「Assets」欄（nano で始まる行）で確認できます。{' '}
+            {M.review.downloadDetails[0]} <code>chrome://on-device-internals</code>
+            {M.review.downloadDetails[1]}{' '}
             <button className="link" onClick={openOnDeviceInternals}>
-              開く
+              {M.review.open}
             </button>
           </p>
         </div>
@@ -228,9 +228,10 @@ function DownloadProgress({ download }: { download: DownloadState }) {
       {/* 進捗が届くまでは不確定表示（value なし）にする */}
       {known ? <progress value={download.ratio} max={1} /> : <progress />}
       <p className="note">
-        {known ? `${Math.floor(download.ratio * 100)}%` : '進捗の通知を待っています'}・経過 <Elapsed since={download.startedAt} />
+        {known ? M.review.downloadPercent(Math.floor(download.ratio * 100)) : M.review.downloadWaiting} · {M.review.downloadElapsed}{' '}
+        <Elapsed since={download.startedAt} />
         <br />
-        Chromeは進捗をまとめて通知することがあります。完了すると自動で処理を再開します。
+        {M.review.downloadNote}
       </p>
     </div>
   );
@@ -243,7 +244,7 @@ function Elapsed({ since }: { since: number }) {
     return () => clearInterval(timer);
   }, []);
   const sec = Math.max(0, Math.floor((now - since) / 1000));
-  return <span className="meta">{sec < 60 ? `${sec}秒` : `${Math.floor(sec / 60)}分${String(sec % 60).padStart(2, '0')}秒`}</span>;
+  return <span className="meta">{sec < 60 ? M.review.seconds(sec) : M.review.minutes(Math.floor(sec / 60), sec % 60)}</span>;
 }
 
 function openOnDeviceInternals() {
@@ -265,32 +266,32 @@ function ResultSection({
   return (
     <section className="section">
       <div className="section-head">
-        <h2>RESULT</h2>
+        <h2>{M.review.result}</h2>
         <span className="meta">
-          {LANGUAGE_LABELS[version.targetLanguage].target}・{SITUATION_LABELS[version.situation].name}
-          {version.durationMs !== undefined && `・${(version.durationMs / 1000).toFixed(1)}秒`}
-          {formatCost(version.result.usage) && `・${formatCost(version.result.usage)}`}
+          {M.languages[version.targetLanguage].target} · {M.situations[version.situation]}
+          {version.durationMs !== undefined && ` · ${M.review.durationSeconds(version.durationMs / 1000)}`}
+          {formatCost(version.result.usage) && ` · ${formatCost(version.result.usage)}`}
         </span>
       </div>
       <div className="result-box">
         <p className="text result">{version.result.revisedText}</p>
-        <CopyButton className="copy" label="Copy" getText={() => version.result.revisedText} />
+        <CopyButton className="copy" label={M.review.copy} getText={() => version.result.revisedText} />
       </div>
       {session.versions.length > 1 && (
         <div className="versions">
           <button disabled={index <= 0} onClick={() => onSelectVersion(session.versions[index - 1].id)}>
-            ← 前の案
+            {M.review.previous}
           </button>
           <span className="meta">
-            案 {index + 1} / {session.versions.length}
-            {version.origin === 'chat' && '（相談で作成）'}
-            {version.origin === 'regenerate' && '（再生成）'}
+            {M.review.versionOf(index + 1, session.versions.length)}
+            {version.origin === 'chat' && M.review.fromChat}
+            {version.origin === 'regenerate' && M.review.regenerated}
           </span>
           <button
             disabled={index >= session.versions.length - 1}
             onClick={() => onSelectVersion(session.versions[index + 1].id)}
           >
-            次の案 →
+            {M.review.next}
           </button>
         </div>
       )}
@@ -298,11 +299,7 @@ function ResultSection({
   );
 }
 
-const CHANGE_TYPE_LABELS: Record<ChangeType, string> = {
-  objective_error: '誤り',
-  style: '改善',
-  uncertain: '要確認',
-};
+const CHANGE_TYPE_LABELS: Record<ChangeType, string> = M.review.changeTypes;
 
 function DiffSection({ session, version }: { session: ReviewSession; version: ResultVersion }) {
   const { result } = version;
@@ -313,12 +310,12 @@ function DiffSection({ session, version }: { session: ReviewSession; version: Re
   const diff = sameLanguage && !unchanged ? diffTexts(sourceText, result.revisedText) : null;
   return (
     <>
-      {unchanged && <p className="unchanged">変更の必要はありません。</p>}
-      {sourceLanguage === 'unknown' && <p className="note">原文の言語を判別できませんでした。</p>}
-      {sourceLanguage === 'mixed' && <p className="note">原文は日本語と英語が混在していると判定しました。</p>}
+      {unchanged && <p className="unchanged">{M.review.unchanged}</p>}
+      {sourceLanguage === 'unknown' && <p className="note">{M.review.unknownLanguage}</p>}
+      {sourceLanguage === 'mixed' && <p className="note">{M.review.mixedLanguage}</p>}
       {diff && (
         <section className="section">
-          <h2>差分</h2>
+          <h2>{M.review.diff}</h2>
           <p className="text diff">
             {diff.map((seg, i) =>
               seg.type === 'equal' ? (
@@ -356,18 +353,18 @@ function ExplanationSection({
     return (
       <details className="section explanation" open>
         <summary>
-          <h2>解説</h2>
+          <h2>{M.review.explanation}</h2>
           {explanation.durationMs !== undefined && (
             <span className="meta">
               {' '}
-              {(explanation.durationMs / 1000).toFixed(1)}秒
-              {formatCost(explanation.usage) && `・${formatCost(explanation.usage)}`}
+              {M.review.durationSeconds(explanation.durationMs / 1000)}
+              {formatCost(explanation.usage) && ` · ${formatCost(explanation.usage)}`}
             </span>
           )}
         </summary>
         <ExplanationBody explanation={explanation} onApplyStructure={onApplyStructure} />
         {explanation.droppedChanges > 0 && (
-          <p className="note">原文・改稿文と照合できなかった変更点 {explanation.droppedChanges} 件は表示していません。</p>
+          <p className="note">{M.review.droppedChanges(explanation.droppedChanges)}</p>
         )}
       </details>
     );
@@ -375,11 +372,11 @@ function ExplanationSection({
 
   return (
     <section className="section explanation">
-      <h2>解説</h2>
+      <h2>{M.review.explanation}</h2>
       {state?.kind === 'running' ? (
         <>
           <p className="note" role="status">
-            <span className="spinner" aria-hidden /> 解説を生成しています… <Elapsed since={state.startedAt} />
+            <span className="spinner" aria-hidden /> {M.review.explaining} <Elapsed since={state.startedAt} />
           </p>
           {state.partial && <ExplanationBody explanation={state.partial} />}
         </>
@@ -390,8 +387,8 @@ function ExplanationSection({
               {state.message}
             </p>
           )}
-          <button onClick={onExplain}>{state?.kind === 'error' ? '解説を再生成' : '解説を見る'}</button>
-          {external && <p className="note">変更点と理由をAIに追加で問い合わせます（改稿より費用がかかります）。</p>}
+          <button onClick={onExplain}>{state?.kind === 'error' ? M.review.regenerateExplanation : M.review.showExplanation}</button>
+          {external && <p className="note">{M.review.explanationCostNote}</p>}
         </>
       )}
     </section>
@@ -406,24 +403,25 @@ function ExplanationBody({
   explanation: PartialExplanation;
   onApplyStructure?: (issues: StructureReview['issues']) => void;
 }) {
-  const { explanationJa, changes = [], nuanceWarnings = [], structure } = explanation;
+  const { explanation: overall, changes = [], nuanceWarnings = [], structure } = explanation;
   const outline = structure?.outline ?? [];
   const issues = structure?.issues ?? [];
   return (
     <>
-      {explanationJa && <p className="text">{explanationJa}</p>}
+      {overall && <p className="text">{overall}</p>}
 
       {changes.length > 0 && (
         <>
-          <h3>変更点</h3>
+          <h3>{M.review.changes}</h3>
           <ul className="changes">
             {changes.map((c, i) => (
               <li key={i}>
                 <span className={`badge badge-${c.type}`}>{CHANGE_TYPE_LABELS[c.type]}</span>
                 <span className="change-pair">
-                  {c.before ? <del>{c.before}</del> : <em>（追加）</em>} → {c.after ? <ins>{c.after}</ins> : <em>（削除）</em>}
+                  {c.before ? <del>{c.before}</del> : <em>{M.review.added}</em>} →{' '}
+                  {c.after ? <ins>{c.after}</ins> : <em>{M.review.removed}</em>}
                 </span>
-                <p className="change-explanation">{c.explanationJa}</p>
+                <p className="change-explanation">{c.explanation}</p>
               </li>
             ))}
           </ul>
@@ -432,7 +430,7 @@ function ExplanationBody({
 
       {nuanceWarnings.length > 0 && (
         <>
-          <h3>意味・ニュアンスの注意</h3>
+          <h3>{M.review.nuance}</h3>
           <ul className="warnings">
             {nuanceWarnings.map((w, i) => (
               <li key={i}>{w}</li>
@@ -443,7 +441,7 @@ function ExplanationBody({
 
       {structure && (outline.length > 0 || issues.length > 0) && (
         <>
-          <h3>構成</h3>
+          <h3>{M.review.structure}</h3>
           {outline.length > 0 && (
             <ol className="outline">
               {outline.map((o, i) => (
@@ -461,10 +459,10 @@ function ExplanationBody({
               ))}
             </ul>
           ) : (
-            outline.length > 0 && <p className="note">構成に大きな問題は見当たりません。</p>
+            outline.length > 0 && <p className="note">{M.review.structureOk}</p>
           )}
           {issues.length > 0 && onApplyStructure && (
-            <button onClick={() => onApplyStructure(issues)}>構成の指摘を反映した案を作る</button>
+            <button onClick={() => onApplyStructure(issues)}>{M.review.applyStructure}</button>
           )}
         </>
       )}

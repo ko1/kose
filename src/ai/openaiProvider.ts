@@ -8,6 +8,7 @@ import type {
   RewriteResult,
 } from '../domain/types';
 import { countChars } from '../domain/text';
+import { M } from '../shared/messages';
 import {
   buildChatSystemPrompt,
   buildExplainPrompt,
@@ -47,13 +48,13 @@ export class OpenAIProvider implements AIProvider {
 
   async availability(_targetLanguage: LanguageCode): Promise<ProviderAvailability> {
     if (!this.config.apiKey) {
-      return { kind: 'unavailable', reason: 'OpenAI APIキーが設定されていません。設定画面で入力してください。' };
+      return { kind: 'unavailable', reason: M.errors.openaiNoKey };
     }
     const granted = await chrome.permissions.contains({ origins: [OPENAI_ORIGIN] });
     if (!granted) {
       return {
         kind: 'unavailable',
-        reason: 'api.openai.com への接続が許可されていません。設定画面でOpenAIを選び直して許可してください。',
+        reason: M.errors.openaiNoPermission,
       };
     }
     return { kind: 'available' };
@@ -110,8 +111,8 @@ export class OpenAIProvider implements AIProvider {
       choices?: { message?: { content?: string | null; refusal?: string | null } }[];
     };
     const message = body.choices?.[0]?.message;
-    if (message?.refusal) throw new ProviderError(`AIが処理を断りました: ${message.refusal}`);
-    if (!message?.content) throw new ProviderError('AIの応答が空でした。');
+    if (message?.refusal) throw new ProviderError(M.errors.refused(message.refusal));
+    if (!message?.content) throw new ProviderError(M.errors.empty);
     return message.content;
   }
 }
@@ -126,10 +127,10 @@ async function describeHttpError(res: Response): Promise<string> {
   }
   switch (res.status) {
     case 401:
-      return 'OpenAI APIキーが無効です。設定画面で確認してください。';
+      return M.errors.openaiInvalidKey;
     case 429:
-      return `OpenAI APIの利用上限に達したか、混雑しています。${detail}`;
+      return M.errors.openaiRateLimit(detail);
     default:
-      return `OpenAI APIエラー (${res.status}) ${detail}`.trim();
+      return M.errors.openaiError(res.status, detail);
   }
 }

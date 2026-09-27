@@ -6,11 +6,11 @@ import type { PartialExplanation } from '../../src/domain/types';
 import { DEFAULT_SETTINGS } from '../../src/storage/settings';
 import { fakeChrome } from '../fakeChrome';
 
-const request = { requestId: 'r', sourceText: 'I has a pen.', targetLanguage: 'en' as const, situation: 'casual' as const };
+const request = { requestId: 'r', sourceText: 'I has a pen.', targetLanguage: 'en' as const, situation: 'casual' as const, explanationLanguage: 'ja' };
 const output = JSON.stringify({ revisedText: 'I have a pen.', detectedSourceLanguage: 'en' });
 const explainOutput = JSON.stringify({
-  explanationJa: '主語と動詞の一致を直しました。',
-  changes: [{ before: 'has', after: 'have', type: 'objective_error', explanationJa: '主語が I なので have' }],
+  explanation: '主語と動詞の一致を直しました。',
+  changes: [{ before: 'has', after: 'have', type: 'objective_error', explanation: '主語が I なので have' }],
   nuanceWarnings: [],
 });
 
@@ -100,7 +100,7 @@ describe('AnthropicProvider', () => {
     expect(params.model).toBe('claude-sonnet-5');
     expect(params.messages.map((m) => m.role)).toEqual(['user', 'assistant', 'user']);
     // 解説文が少しずつ伸び、最後に変更点が揃う
-    const texts = partials.map((p) => p.explanationJa ?? '');
+    const texts = partials.map((p) => p.explanation ?? '');
     expect(texts.some((t) => t.length > 0 && t.length < '主語と動詞の一致を直しました。'.length)).toBe(true);
     expect(partials.at(-1)?.changes).toHaveLength(1);
     // 同じ内容は重ねて通知しない
@@ -124,7 +124,7 @@ describe('AnthropicProvider', () => {
   });
 
   it('相談は解説と同じモデルで、会話履歴付きで問い合わせ、返答を生成しながら通知する', async () => {
-    const reply = JSON.stringify({ replyJa: '苦労のニュアンスを加えました。', revisedText: 'I finally made it home.' });
+    const reply = JSON.stringify({ reply: '苦労のニュアンスを加えました。', revisedText: 'I finally made it home.' });
     const { client, stream } = fakeClient(textDeltas(reply, 6), {
       stop_reason: 'end_turn',
       content: [{ type: 'text', text: reply }],
@@ -136,6 +136,7 @@ describe('AnthropicProvider', () => {
         sourceText: '家に帰った',
         targetLanguage: 'en',
         situation: 'casual',
+        explanationLanguage: 'ja',
         currentRevisedText: 'I went home.',
         previousRevisedTexts: ['I went home.'],
         history: [],
@@ -203,7 +204,7 @@ describe('AnthropicProvider', () => {
     for (const stop_reason of ['refusal', 'max_tokens']) {
       const { client } = fakeClient([], { stop_reason, content: [] });
       await expect(new AnthropicProvider(config, () => client).rewrite(request)).rejects.toThrow(
-        stop_reason === 'refusal' ? /断りました/ : /打ち切られました/,
+        stop_reason === 'refusal' ? /declined/ : /cut off/,
       );
     }
   });

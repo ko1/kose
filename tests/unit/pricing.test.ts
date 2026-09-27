@@ -16,11 +16,12 @@ describe('pricing', () => {
     expect(anthropicCostUsd('claude-haiku-4-50', { input: 1, output: 1 })).toBeUndefined();
   });
 
-  it('円で表示する（料金が分からなければ null）', () => {
+  it('shows USD with two significant digits (null when the cost is unknown)', () => {
     const u = (costUsd?: number) => ({ model: 'm', inputTokens: 0, outputTokens: 0, costUsd });
-    expect(formatCost(u(0.0013))).toBe('約0.2円');
-    expect(formatCost(u(0.0001))).toBe('0.1円未満');
-    expect(formatCost(u(0.2))).toBe('約30円');
+    expect(formatCost(u(0.0013))).toBe('$0.0013');
+    expect(formatCost(u(0.00001))).toBe('<$0.0001');
+    expect(formatCost(u(0.01149))).toBe('$0.011');
+    expect(formatCost(u(0.2))).toBe('$0.2');
     expect(formatCost(u())).toBeNull();
     expect(formatCost(undefined)).toBeNull();
   });

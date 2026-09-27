@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { M } from '../shared/messages';
 import type {
   ChatReply,
   ChatRequest,
@@ -63,13 +64,13 @@ export class AnthropicProvider implements AIProvider {
 
   async availability(_targetLanguage: LanguageCode): Promise<ProviderAvailability> {
     if (!this.config.apiKey) {
-      return { kind: 'unavailable', reason: 'Anthropic APIキーが設定されていません。設定画面で入力してください。' };
+      return { kind: 'unavailable', reason: M.errors.anthropicNoKey };
     }
     const granted = await chrome.permissions.contains({ origins: [ANTHROPIC_ORIGIN] });
     if (!granted) {
       return {
         kind: 'unavailable',
-        reason: 'api.anthropic.com への接続が許可されていません。設定画面でClaudeを選び直して許可してください。',
+        reason: M.errors.anthropicNoPermission,
       };
     }
     return { kind: 'available' };
@@ -127,7 +128,7 @@ export class AnthropicProvider implements AIProvider {
     return { ...parseExplainOutput(raw, request.sourceText, request.revisedText, request.reviewStructure), usage };
   }
 
-  async chat(request: ChatRequest, signal?: AbortSignal, onPartial?: (replyJa: string) => void): Promise<ChatReply> {
+  async chat(request: ChatRequest, signal?: AbortSignal, onPartial?: (reply: string) => void): Promise<ChatReply> {
     const notify = onPartial && distinct(onPartial, (t) => t);
     // 相談には判断力が要るので解説と同じモデルを使う
     const { text: raw, usage } = await this.stream(
@@ -138,7 +139,7 @@ export class AnthropicProvider implements AIProvider {
       signal,
       notify &&
         ((text) => {
-          const partial = extractPartialStringField(text, 'replyJa');
+          const partial = extractPartialStringField(text, 'reply');
           if (partial !== null) notify(partial);
         }),
     );
@@ -184,10 +185,10 @@ export class AnthropicProvider implements AIProvider {
       }
       const message = await stream.finalMessage();
       if (message.stop_reason === 'refusal') {
-        throw new ProviderError('Claudeがこの文章の処理を断りました。');
+        throw new ProviderError(M.errors.claudeRefused);
       }
       if (message.stop_reason === 'max_tokens') {
-        throw new ProviderError('Claudeの出力が長すぎて途中で打ち切られました。選択範囲を短くしてください。');
+        throw new ProviderError(M.errors.claudeMaxTokens);
       }
       return { text: finalText(message.content), usage: toUsage(message.model, message.usage) };
     } catch (e) {
@@ -226,25 +227,25 @@ function finalText(content: Anthropic.Beta.BetaContentBlock[]): string {
 
 function describeError(e: unknown): unknown {
   if (e instanceof Anthropic.AuthenticationError) {
-    return new ProviderError('Anthropic APIキーが無効です。設定画面で確認してください。');
+    return new ProviderError(M.errors.anthropicInvalidKey);
   }
   if (e instanceof Anthropic.PermissionDeniedError) {
-    return new ProviderError(`このAPIキーではこのモデルを利用できません。${e.message}`);
+    return new ProviderError(M.errors.anthropicModelDenied(e.message));
   }
   if (e instanceof Anthropic.NotFoundError) {
-    return new ProviderError('指定したモデルが見つかりません。設定画面でモデル名を確認してください。');
+    return new ProviderError(M.errors.anthropicModelNotFound);
   }
   if (e instanceof Anthropic.RateLimitError) {
-    return new ProviderError('Anthropic APIの利用上限に達したか、混雑しています。しばらくしてから再実行してください。');
+    return new ProviderError(M.errors.anthropicRateLimit);
   }
   if (e instanceof Anthropic.APIUserAbortError) {
     return new DOMException('aborted', 'AbortError');
   }
   if (e instanceof Anthropic.APIConnectionError) {
-    return new ProviderError('Anthropic APIに接続できませんでした。ネットワークを確認してください。');
+    return new ProviderError(M.errors.anthropicConnection);
   }
   if (e instanceof Anthropic.APIError) {
-    return new ProviderError(`Anthropic APIエラー (${e.status ?? '不明'}) ${e.message}`);
+    return new ProviderError(M.errors.anthropicError(String(e.status ?? M.errors.unknownStatus), e.message));
   }
   return e;
 }
