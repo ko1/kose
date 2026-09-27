@@ -61,7 +61,7 @@ KOSE_WIN_DIR=/mnt/c/Users/<you>/kose-dist npm run build:win   # custom destinati
 4. Change “Mode” (Make it good Japanese / good English) / “Situation” at the top and press “Apply” to regenerate from the same original. The button is enabled only when the dropdowns differ from the displayed version. Changing the dropdowns alone does not call the AI. The chosen “Mode” is used for the next invocation.
 5. Ask about the rewrite in “Discuss the nuance”. Enter sends, Shift+Enter inserts a newline (Enter while composing Japanese input does not send).
 6. While the rewrite is being generated, a due mistake may appear under “Review while you wait”. Answer it or ignore it; it folds up when the result arrives. “Review N” in the header reviews all due mistakes.
-7. With no selection (or on pages kose cannot read), the toolbar button and Alt+K open “✏️ Free input” with the cursor in the text area. Type, then Ctrl+Enter (or “Run kose”). The result appears below; the draft stays until the browser exits. “✏️ Free input” is always the first item in the header's list. Settings: “⚙ Settings” at the bottom (including “Mistake notes and review”).
+7. With no selection (or on pages kose cannot read), the toolbar button and Alt+K open “✏️ Free input” with the cursor in the text area. Type, then Ctrl+Enter (or “kose”). The result appears below; the draft stays until the browser exits. “✏️ Free input” is always the first item in the header's list. Settings: “⚙ Settings” at the bottom (including “Mistake notes and review”).
 
 The kose window is a normal window, so it goes behind Chrome when Chrome is focused. Chrome extensions cannot make a window always-on-top; use an OS tool such as PowerToys "Always on Top" if you want that.
 

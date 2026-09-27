@@ -51,7 +51,7 @@ const en = {
     placeholder: 'Write text here and press Ctrl+Enter to run kose',
     label: 'Free input',
     hint: 'Ctrl+Enter to run. The draft is kept until the browser closes.',
-    run: 'Run kose',
+    run: 'kose',
     usage: [
       'You can also select text on a web page and use right-click → “kose”, the kose toolbar button, or Alt+K.',
       'kose uses the mode you chose last (good Japanese / good English). Change “Mode” above and press “Apply” to rewrite.',
@@ -300,7 +300,7 @@ const ja: Messages = {
     placeholder: 'ここに文章を書いて、Ctrl+Enter で kose にかけます',
     label: '自由入力',
     hint: 'Ctrl+Enter で実行。下書きはブラウザを閉じるまで残ります。',
-    run: 'kose にかける',
+    run: 'kose',
     usage: [
       'Webページで文章を選択し、右クリック →「kose」、ツールバーの kose ボタン、または Alt+K でも実行できます。',
       '最後に選んだ機能（よい日本語にする／よい英語にする）で実行します。上の「機能」を切り替えて「変更」を押すと作り直せます。',
