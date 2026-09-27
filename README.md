@@ -11,6 +11,7 @@ Implemented so far: **Phase 1 (rewrite)** and **Phase 2 (nuance chat)**. Automat
 - Two-stage processing to keep cloud costs low:
   1. On right-click, only the rewrite is generated (short prompt, small output)
   2. The explanation (changes with error/style classification and reasons in Japanese, plus meaning/nuance warnings) is a second request — automatic with Chrome's built-in AI, on demand (「解説を見る」) with cloud providers
+- **Structure review** for long texts (500+ characters or 3+ paragraphs): the explanation adds an outline of each paragraph and points out problems in order, flow, transitions, repetition and paragraph breaks. It only points things out; 「構成の指摘を反映した案を作る」 sends the issues to the chat to get a restructured version.
 - **Nuance chat** (「ニュアンスを相談」): ask about wording or request changes ("make it sound like getting home was hard"). A requested change becomes a new version of the result; plain questions never change it. Each review has its own conversation.
 - One review per browser tab; the kose window follows the active tab
 - Change the target language / situation at the bottom and regenerate; switch between earlier versions

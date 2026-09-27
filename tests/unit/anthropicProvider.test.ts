@@ -91,7 +91,7 @@ describe('AnthropicProvider', () => {
     });
     const partials: PartialExplanation[] = [];
     const e = await new AnthropicProvider(config, () => client).explain(
-      { ...request, revisedText: 'I have a pen.' },
+      { ...request, revisedText: 'I have a pen.', reviewStructure: false },
       undefined,
       (p) => partials.push(p),
     );
@@ -105,6 +105,22 @@ describe('AnthropicProvider', () => {
     expect(partials.at(-1)?.changes).toHaveLength(1);
     // 同じ内容は重ねて通知しない
     expect(new Set(partials.map((p) => JSON.stringify(p))).size).toBe(partials.length);
+  });
+
+  it('長文では構成の項目を含むスキーマで解説を求める', async () => {
+    const withStructure = JSON.stringify({
+      ...JSON.parse(explainOutput),
+      structure: { outline: ['経歴'], issues: [{ problem: '結論が最後', suggestion: '先頭へ' }] },
+    });
+    const { client, stream } = fakeClient([], { stop_reason: 'end_turn', content: [{ type: 'text', text: withStructure }] });
+    const e = await new AnthropicProvider(config, () => client).explain({
+      ...request,
+      revisedText: 'I have a pen.',
+      reviewStructure: true,
+    });
+    expect(e.structure?.issues).toHaveLength(1);
+    const params = stream.mock.calls[0][0] as { output_config: { format: { schema: { required: string[] } } } };
+    expect(params.output_config.format.schema.required).toContain('structure');
   });
 
   it('相談は解説と同じモデルで、会話履歴付きで問い合わせ、返答を生成しながら通知する', async () => {

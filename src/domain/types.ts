@@ -45,11 +45,20 @@ export interface RewriteResult {
   usage?: Usage;
 }
 
+/** 長文の構成についての指摘（書き換えはしない） */
+export interface StructureReview {
+  /** 段落（またはまとまり）ごとの要点 */
+  outline: string[];
+  issues: { problem: string; suggestion: string }[];
+}
+
 /** 2段目（解説）の結果 */
 export interface Explanation {
   explanationJa: string;
   changes: Change[];
   nuanceWarnings: string[];
+  /** 長文のときだけ */
+  structure?: StructureReview;
   /** 原文・改稿文と照合できず表示から除外した変更点の数 */
   droppedChanges: number;
   /** 生成したプロバイダーと所要時間。デバッグ・速度確認用 */
@@ -59,7 +68,9 @@ export interface Explanation {
 }
 
 /** 生成途中の解説（表示用） */
-export type PartialExplanation = Partial<Pick<Explanation, 'explanationJa' | 'changes' | 'nuanceWarnings'>>;
+export type PartialExplanation = Partial<Pick<Explanation, 'explanationJa' | 'changes' | 'nuanceWarnings'>> & {
+  structure?: Partial<StructureReview>;
+};
 
 export interface ExplainRequest {
   requestId: string;
@@ -67,6 +78,8 @@ export interface ExplainRequest {
   revisedText: string;
   targetLanguage: LanguageCode;
   situation: Situation;
+  /** 長文の構成も見るか */
+  reviewStructure: boolean;
 }
 
 export type VersionOrigin = 'initial' | 'regenerate' | 'chat';

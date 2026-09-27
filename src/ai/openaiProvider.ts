@@ -72,8 +72,8 @@ export class OpenAIProvider implements AIProvider {
 
   async explain(request: ExplainRequest, signal?: AbortSignal): Promise<Explanation> {
     const messages = [...initialMessages('explain'), { role: 'user' as const, content: buildExplainPrompt(request) }];
-    const raw = await this.complete(messages, 'explanation', explainJsonSchema(), signal);
-    return parseExplainOutput(raw, request.sourceText, request.revisedText);
+    const raw = await this.complete(messages, 'explanation', explainJsonSchema(request.reviewStructure), signal);
+    return parseExplainOutput(raw, request.sourceText, request.revisedText, request.reviewStructure);
   }
 
   async chat(request: ChatRequest, signal?: AbortSignal): Promise<ChatReply> {

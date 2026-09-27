@@ -12,7 +12,7 @@ const explainOutput = JSON.stringify({
   nuanceWarnings: [],
 });
 const request = { requestId: 'r', sourceText: 'こんにちは。', targetLanguage: 'en' as const, situation: 'casual' as const };
-const explainRequest = { ...request, revisedText: 'Hello.' };
+const explainRequest = { ...request, revisedText: 'Hello.', reviewStructure: false };
 const chatRequest = {
   requestId: 'c',
   sourceText: 'こんにちは。',

@@ -4,7 +4,8 @@ import { diffTexts } from '../domain/diff';
 import { LANGUAGE_LABELS, SITUATION_LABELS } from '../domain/labels';
 import { currentVersion } from '../domain/session';
 import { countChars } from '../domain/text';
-import type { ChangeType, PartialExplanation, ResultVersion, ReviewSession } from '../domain/types';
+import { structureApplyMessage } from '../domain/structure';
+import type { ChangeType, PartialExplanation, ResultVersion, ReviewSession, StructureReview } from '../domain/types';
 import { ChatSection } from './ChatSection';
 import type { ChatState, DownloadState, ExplainState } from './controller';
 
@@ -85,6 +86,11 @@ export function ReviewView({
             state={explainStates[version.id]}
             external={external}
             onExplain={() => onExplain(version.id)}
+            onApplyStructure={
+              session.status.kind === 'running' || chatState?.kind === 'running'
+                ? undefined
+                : (issues) => onSendChat(structureApplyMessage(issues))
+            }
           />
           <ChatSection
             session={session}
@@ -298,12 +304,15 @@ function ExplanationSection({
   state,
   external,
   onExplain,
+  onApplyStructure,
 }: {
   version: ResultVersion;
   state: ExplainState | undefined;
   /** クラウドへ送信するプロバイダーか（ボタンに費用がかかることを示す） */
   external: boolean;
   onExplain: () => void;
+  /** 構成の指摘を相談に送って、構成を直した案を作る。送れないときは undefined */
+  onApplyStructure?: (issues: StructureReview['issues']) => void;
 }) {
   const explanation = version.explanation;
   if (explanation) {
@@ -319,7 +328,7 @@ function ExplanationSection({
             </span>
           )}
         </summary>
-        <ExplanationBody explanation={explanation} />
+        <ExplanationBody explanation={explanation} onApplyStructure={onApplyStructure} />
         {explanation.droppedChanges > 0 && (
           <p className="note">原文・改稿文と照合できなかった変更点 {explanation.droppedChanges} 件は表示していません。</p>
         )}
@@ -353,8 +362,16 @@ function ExplanationSection({
 }
 
 /** 解説の本文。生成途中（一部の項目だけ）でも表示できる */
-function ExplanationBody({ explanation }: { explanation: PartialExplanation }) {
-  const { explanationJa, changes = [], nuanceWarnings = [] } = explanation;
+function ExplanationBody({
+  explanation,
+  onApplyStructure,
+}: {
+  explanation: PartialExplanation;
+  onApplyStructure?: (issues: StructureReview['issues']) => void;
+}) {
+  const { explanationJa, changes = [], nuanceWarnings = [], structure } = explanation;
+  const outline = structure?.outline ?? [];
+  const issues = structure?.issues ?? [];
   return (
     <>
       {explanationJa && <p className="text">{explanationJa}</p>}
@@ -384,6 +401,34 @@ function ExplanationBody({ explanation }: { explanation: PartialExplanation }) {
               <li key={i}>{w}</li>
             ))}
           </ul>
+        </>
+      )}
+
+      {structure && (outline.length > 0 || issues.length > 0) && (
+        <>
+          <h3>構成</h3>
+          {outline.length > 0 && (
+            <ol className="outline">
+              {outline.map((o, i) => (
+                <li key={i}>{o}</li>
+              ))}
+            </ol>
+          )}
+          {issues.length > 0 ? (
+            <ul className="structure-issues">
+              {issues.map((it, i) => (
+                <li key={i}>
+                  <p>{it.problem}</p>
+                  <p className="change-explanation">→ {it.suggestion}</p>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            outline.length > 0 && <p className="note">構成に大きな問題は見当たりません。</p>
+          )}
+          {issues.length > 0 && onApplyStructure && (
+            <button onClick={() => onApplyStructure(issues)}>構成の指摘を反映した案を作る</button>
+          )}
         </>
       )}
     </>

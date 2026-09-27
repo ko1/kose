@@ -84,6 +84,8 @@ function closeJson(text: string): string {
   return out + stack.reverse().join('');
 }
 
+const strings = (xs: unknown[]): string[] => xs.filter((x): x is string => typeof x === 'string');
+
 const CHANGE_TYPES = new Set(['objective_error', 'style', 'uncertain']);
 
 /** 生成途中の解説JSONから、表示できる部分だけを取り出す */
@@ -105,7 +107,19 @@ export function extractPartialExplanation(raw: string): PartialExplanation | nul
     );
   }
   if (Array.isArray(obj.nuanceWarnings)) {
-    out.nuanceWarnings = obj.nuanceWarnings.filter((w): w is string => typeof w === 'string');
+    out.nuanceWarnings = strings(obj.nuanceWarnings);
+  }
+  if (typeof obj.structure === 'object' && obj.structure !== null) {
+    const st = obj.structure as Record<string, unknown>;
+    out.structure = {
+      outline: Array.isArray(st.outline) ? strings(st.outline) : [],
+      issues: Array.isArray(st.issues)
+        ? st.issues.filter(
+            (i): i is { problem: string; suggestion: string } =>
+              typeof i === 'object' && i !== null && typeof i.problem === 'string' && typeof i.suggestion === 'string',
+          )
+        : [],
+    };
   }
   return out;
 }

@@ -149,7 +149,7 @@ export class BuiltinProvider implements AIProvider {
     const session = await forkSession(lm, 'explain', request.targetLanguage, signal);
     try {
       const input = buildExplainPrompt(request);
-      const options = { responseConstraint: explainJsonSchema(), signal };
+      const options = { responseConstraint: explainJsonSchema(request.reviewStructure), signal };
       const notify = onPartial && distinct(onPartial);
       const raw =
         notify && session.promptStreaming
@@ -158,7 +158,7 @@ export class BuiltinProvider implements AIProvider {
               if (partial) notify(partial);
             })
           : await session.prompt(input, options);
-      return parseExplainOutput(raw, request.sourceText, request.revisedText);
+      return parseExplainOutput(raw, request.sourceText, request.revisedText, request.reviewStructure);
     } finally {
       session.destroy();
     }

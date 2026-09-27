@@ -10,6 +10,7 @@ import {
   setExplanation,
 } from '../domain/session';
 import type { PartialExplanation, PendingRequest, ReviewSession, SessionStatus } from '../domain/types';
+import { needsStructureReview } from '../domain/structure';
 import { newId } from '../shared/ids';
 import { isPendingKey, loadAll, saveSession, takePending } from '../storage/sessionStore';
 import { loadSettings, onSettingsChanged, saveSettings, Settings } from '../storage/settings';
@@ -257,6 +258,7 @@ export class KoseController {
           revisedText: version.result.revisedText,
           targetLanguage: version.targetLanguage,
           situation: version.situation,
+          reviewStructure: needsStructureReview(version.result.revisedText),
         },
         abort.signal,
         (partial) => {

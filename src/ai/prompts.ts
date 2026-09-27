@@ -47,14 +47,18 @@ Output fields:
   - type "uncertain": a change that depends on the author's intent or that you are not sure about.
   - explanationJa of each change: the concrete reason (which rule, or what nuance changes). Generic phrases such as「より自然な表現に修正」alone are not allowed.
 - nuanceWarnings: notes about possible changes in meaning or nuance, and ambiguities. Empty array if none.
+- structure (only when the schema has it, for long texts): review the structure of the rewritten text. Do not rewrite anything; only point things out.
+  - outline: the point of each paragraph (or group of sentences) in one short Japanese line, in order.
+  - issues: problems with the order of ideas, logical flow, missing transitions, repetition, paragraph breaks, or fit to the conventions of the situation (e.g. the conclusion first in a work email, claim then evidence in academic writing). Each has problem and a concrete suggestion. Empty array if the structure is fine.
 
 Respond with JSON only.`;
 
-export function buildExplainPrompt(req: Omit<ExplainRequest, 'requestId'>): string {
+export function buildExplainPrompt(req: Omit<ExplainRequest, 'requestId' | 'reviewStructure'> & { reviewStructure?: boolean }): string {
   const target = LANGUAGE_LABELS[req.targetLanguage].english;
   const situation = SITUATION_LABELS[req.situation];
   return `Target language: ${target}
 Situation: ${situation.name} — ${situation.guidance}
+Structure review: ${req.reviewStructure ? 'requested (long text)' : 'not requested'}
 
 Source text:
 <<<SOURCE_TEXT
@@ -127,6 +131,7 @@ Rules:
 - If the user asks for a change to the wording (e.g. "もっと丁寧に", "苦労したニュアンスを出して"), write a new full rewrite in the target language in revisedText, keeping the parts the user did not ask to change.
 - If the user only asks a question, answer it and leave revisedText as an empty string. Do not change the rewrite on your own.
 - Preserve the meaning of the source. Do not add facts that are not in the source or requested by the user.
+- The user sees replyJa in a chat pane and revisedText separately, as the result above the chat. So in replyJa, refer to the new rewrite as the updated result (e.g. 「上の改稿案に反映しました」); do not say it follows below and do not repeat the whole rewrite.
 - Respond with JSON only: replyJa (your answer in Japanese), revisedText (the new full rewrite, or "").`;
 
 /** 相談の会話の前提（原文・設定・改稿案の履歴）を含むシステムプロンプト */

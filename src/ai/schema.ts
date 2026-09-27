@@ -24,6 +24,14 @@ export const explainOutputSchema = z.strictObject({
   nuanceWarnings: z.array(z.string()),
 });
 
+/** 2段目（長文）: 解説に構成の指摘を加える */
+export const explainWithStructureOutputSchema = explainOutputSchema.extend({
+  structure: z.strictObject({
+    outline: z.array(z.string()),
+    issues: z.array(z.strictObject({ problem: z.string(), suggestion: z.string() })),
+  }),
+});
+
 /**
  * ニュアンス相談: 返答と、新しい改稿案（作らないときは空文字）。
  * null を使うと各APIの構造化出力で扱いが分かれるので、空文字で「なし」を表す。
@@ -39,7 +47,8 @@ function toJsonSchema(schema: z.ZodType): Record<string, unknown> {
 }
 
 export const rewriteJsonSchema = (): Record<string, unknown> => toJsonSchema(rewriteOutputSchema);
-export const explainJsonSchema = (): Record<string, unknown> => toJsonSchema(explainOutputSchema);
+export const explainJsonSchema = (withStructure = false): Record<string, unknown> =>
+  toJsonSchema(withStructure ? explainWithStructureOutputSchema : explainOutputSchema);
 export const chatJsonSchema = (): Record<string, unknown> => toJsonSchema(chatOutputSchema);
 
 export class InvalidModelOutputError extends Error {
@@ -76,8 +85,15 @@ export function parseRewriteOutput(raw: string): RewriteResult {
  * 2段目の出力を検証する。before/after が原文・改稿文に実在しない変更点は除外する
  * （誤りの根拠にしない）。
  */
-export function parseExplainOutput(raw: string, sourceText: string, revisedText: string): Explanation {
-  const out = parseJson(raw, explainOutputSchema);
+export function parseExplainOutput(
+  raw: string,
+  sourceText: string,
+  revisedText: string,
+  withStructure = false,
+): Explanation {
+  const out: Omit<Explanation, 'droppedChanges'> = withStructure
+    ? parseJson(raw, explainWithStructureOutputSchema)
+    : parseJson(raw, explainOutputSchema);
   const changes = out.changes.filter(
     (c) =>
       !(c.before === '' && c.after === '') &&

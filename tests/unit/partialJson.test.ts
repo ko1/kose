@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { appendChunk, extractPartialStringField, parsePartialJson } from '../../src/ai/partialJson';
+import { appendChunk, extractPartialExplanation, extractPartialStringField, parsePartialJson } from '../../src/ai/partialJson';
 
 describe('extractPartialStringField', () => {
   it('フィールドがまだ無ければ null', () => {
@@ -50,5 +50,17 @@ describe('parsePartialJson', () => {
     expect(parsePartialJson('{"a":[1,2]}')).toEqual({ a: [1, 2] });
     expect(parsePartialJson('')).toBeNull();
     expect(parsePartialJson('hello')).toBeNull();
+  });
+});
+
+describe('extractPartialExplanation', () => {
+  it('完成した変更点・構成の指摘だけを取り出す', () => {
+    const raw =
+      '{"explanationJa":"説明","changes":[{"before":"a","after":"b","type":"style","explanationJa":"x"},{"before":"c","after":"d","type":"sty' +
+      '"}],"nuanceWarnings":[],"structure":{"outline":["導入"],"issues":[{"problem":"順序","suggestion":"入れ替え"},{"problem":"途中';
+    const p = extractPartialExplanation(raw);
+    expect(p?.explanationJa).toBe('説明');
+    expect(p?.changes).toHaveLength(1);
+    expect(p?.structure).toEqual({ outline: ['導入'], issues: [{ problem: '順序', suggestion: '入れ替え' }] });
   });
 });

@@ -145,6 +145,20 @@ describe('KoseController', () => {
     expect(snap().explainStates[versionId]).toBeUndefined();
   });
 
+  it('長文の改稿では解説で構成も見る', async () => {
+    const { provider } = await setup();
+    await putPending(pending(1, '短い'));
+    await flush();
+    provider.answer(0, '短い改稿');
+    await flush();
+    expect(provider.explainCalls[0].request.reviewStructure).toBe(false);
+    await putPending(pending(2, '長い'));
+    await flush();
+    provider.answer(1, 'x'.repeat(600));
+    await flush();
+    expect(provider.explainCalls[1].request.reviewStructure).toBe(true);
+  });
+
   it('クラウドでは解説を自動で生成せず、要求されたときだけ生成する', async () => {
     const provider = new FakeProvider();
     provider.sendsExternally = true;

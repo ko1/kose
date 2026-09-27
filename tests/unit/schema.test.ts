@@ -63,6 +63,15 @@ describe('parseExplainOutput（2段目）', () => {
     expect(e.droppedChanges).toBe(2);
   });
 
+  it('長文では構成の指摘を受け取り、構成が欠けていればエラー', () => {
+    const structure = { outline: ['導入', '経歴'], issues: [{ problem: '結論が最後にある', suggestion: '冒頭に移す' }] };
+    const e = parseExplainOutput(JSON.stringify({ ...valid, structure }), source, revised, true);
+    expect(e.structure).toEqual(structure);
+    expect(() => parseExplainOutput(JSON.stringify(valid), source, revised, true)).toThrow(InvalidModelOutputError);
+    // 構成を求めていないときは構成の項目を含めない
+    expect(parseExplainOutput(JSON.stringify(valid), source, revised).structure).toBeUndefined();
+  });
+
   it('スキーマに合わなければエラー', () => {
     const { changes: _c, ...missing } = valid;
     expect(() => parseExplainOutput(JSON.stringify(missing), source, revised)).toThrow(InvalidModelOutputError);
@@ -89,7 +98,8 @@ describe('parseChatOutput（相談）', () => {
 describe('JSON Schema', () => {
   it.each([
     ['rewrite', rewriteJsonSchema],
-    ['explain', explainJsonSchema],
+    ['explain', () => explainJsonSchema()],
+    ['explain with structure', () => explainJsonSchema(true)],
     ['chat', chatJsonSchema],
   ])('%s は OpenAI strict モードの要件（全項目 required、追加プロパティ禁止）を満たす', (_name, build) => {
     const schema = build() as {

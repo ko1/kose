@@ -51,17 +51,14 @@ export function ChatSection({ session, state, disabled, external, onSend, onRetr
             <p className="text">{m.content}</p>
             {m.role === 'assistant' && (m.versionId || formatCost(m.usage)) && (
               <p className="message-meta">
-                {m.versionId && (
-                  <button
-                    className="link"
-                    onClick={() => onSelectVersion(m.versionId!)}
-                    disabled={session.currentVersionId === m.versionId}
-                  >
-                    {session.currentVersionId === m.versionId
-                      ? `案 ${versionNumber(m.versionId)} を表示中`
-                      : `案 ${versionNumber(m.versionId)} を表示`}
-                  </button>
-                )}
+                {m.versionId &&
+                  (session.currentVersionId === m.versionId ? (
+                    <span className="version-updated">↑ RESULT を案 {versionNumber(m.versionId)} に更新しました</span>
+                  ) : (
+                    <button className="link" onClick={() => onSelectVersion(m.versionId!)}>
+                      ↑ 案 {versionNumber(m.versionId)} を RESULT に表示
+                    </button>
+                  ))}
                 {formatCost(m.usage) && <span className="meta">{formatCost(m.usage)}</span>}
               </p>
             )}

@@ -20,6 +20,7 @@ This document is the single source of truth for **kose**, a Chrome extension for
    - On right-click only the rewrite is generated (streamed as it is produced). The diff is computed locally in the browser (no AI cost).
    - The explanation is a second request. With Chrome built-in AI it runs automatically; with cloud providers it runs when the user presses 「解説を見る」 (can be made automatic in settings). It is also streamed.
    - The explanation is in Japanese and titled 「解説」 (not 「理由」). It lists changes, distinguishes objective errors from optional style improvements, and warns about possible changes of meaning and ambiguities. If no change is needed, kose says so.
+   - For long texts (500+ characters or 3+ paragraphs) the explanation also reviews the **structure** (構成): a one-line outline per paragraph and issues with the order of ideas, flow, transitions, repetition, paragraph breaks and the conventions of the situation, each with a suggestion. The rewrite itself never restructures the text. 「構成の指摘を反映した案を作る」 sends the issues to the chat, which creates a restructured version.
 6. Below that is the chat **「ニュアンスを相談」 (discuss the nuance)**. With the session's original, rewrite history and situation as context, the user can discuss meaning and wording. When the chat produces a new rewrite, RESULT is updated. Earlier versions can be restored.
 7. At the bottom are the 「仕上がり」 (target language) and 「用途」 (situation) dropdowns and a 「この設定で再生成」 (regenerate with these settings) button. Settings are stored in `chrome.storage.local`. Changing a dropdown does not call the API; regeneration does. A right-click menu choice is reflected in the target dropdown.
 8. **There is no "save mistake" button.** Only clear, real grammatical/usage errors are detected and saved locally, automatically (§2). Optional rewording and translation differences are never called "the user's mistakes".
@@ -187,6 +188,10 @@ interface Explanation {
   explanationJa: string;
   changes: Change[];
   nuanceWarnings: string[];
+  structure?: {             // long texts only
+    outline: string[];      // the point of each paragraph
+    issues: { problem: string; suggestion: string }[];
+  };
   droppedChanges: number; // changes whose before/after were not found in the texts
   provider?: string;
   durationMs?: number;

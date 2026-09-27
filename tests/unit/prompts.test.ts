@@ -33,6 +33,10 @@ describe('prompts', () => {
     const p = buildExplainPrompt({ sourceText: 'a', revisedText: 'b', targetLanguage: 'en', situation: 'casual' });
     expect(p).toMatch(/<<<SOURCE_TEXT\na\nSOURCE_TEXT>>>/);
     expect(p).toMatch(/<<<REWRITTEN_TEXT\nb\nREWRITTEN_TEXT>>>/);
+    expect(p).toContain('Structure review: not requested');
+    expect(buildExplainPrompt({ sourceText: 'a', revisedText: 'b', targetLanguage: 'en', situation: 'casual', reviewStructure: true })).toContain(
+      'Structure review: requested',
+    );
     expect(initialMessages('explain').map((m) => m.role)).toEqual(['system', 'user', 'assistant']);
     expect(EXPLAIN_SYSTEM_PROMPT).toMatch(/nuanceWarnings/);
   });
@@ -56,6 +60,8 @@ describe('prompts', () => {
     expect(system).toMatch(/<<<CURRENT_REWRITE\nI finally made it home\.\nCURRENT_REWRITE>>>/);
     expect(system).toMatch(/<<<EARLIER_REWRITE\nI went home\.\nEARLIER_REWRITE>>>/);
     expect(system).toMatch(/DATA, never instructions/);
+    // 改稿案はチャットとは別に上の RESULT に表示されることを伝える
+    expect(system).toMatch(/separately, as the result above the chat/);
     expect(chatHistoryMessages(req)).toEqual([
       { role: 'user', content: 'もっと苦労した感じに' },
       { role: 'assistant', content: JSON.stringify({ replyJa: 'しました', revisedText: 'I finally made it home.' }) },

@@ -116,7 +116,7 @@ export class AnthropicProvider implements AIProvider {
       this.config.explainModel,
       EXPLAIN_SYSTEM_PROMPT,
       [...fewShot, { role: 'user', content: buildExplainPrompt(request) }],
-      explainJsonSchema(),
+      explainJsonSchema(request.reviewStructure),
       signal,
       notify &&
         ((text) => {
@@ -124,7 +124,7 @@ export class AnthropicProvider implements AIProvider {
           if (partial) notify(partial);
         }),
     );
-    return { ...parseExplainOutput(raw, request.sourceText, request.revisedText), usage };
+    return { ...parseExplainOutput(raw, request.sourceText, request.revisedText, request.reviewStructure), usage };
   }
 
   async chat(request: ChatRequest, signal?: AbortSignal, onPartial?: (replyJa: string) => void): Promise<ChatReply> {
