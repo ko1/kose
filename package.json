@@ -8,6 +8,7 @@
   "scripts": {
     "build": "vite build",
     "build:win": "vite build && node scripts/copy-to-windows.mjs",
+    "zip": "npm run check && node scripts/zip.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",

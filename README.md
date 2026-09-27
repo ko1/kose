@@ -168,6 +168,7 @@ npm run typecheck    # tsc
 npm test             # vitest (chrome APIs are faked: tests/fakeChrome.ts)
 npm run build        # vite build → dist/
 npm run check        # all three
+npm run zip          # check, then create release/kose-<version>.zip for the Chrome Web Store
 ```
 
 ```
@@ -186,6 +187,10 @@ tests/
 ```
 
 UI strings are in message catalogs (`src/shared/messages.ts`, Japanese and English). Code comments are in Japanese.
+
+## Privacy
+
+See [docs/privacy.md](docs/privacy.md). kose has no server of its own; text leaves your browser only when you select Claude or OpenAI, and only to that provider.
 
 ## License
 
