@@ -39,4 +39,4 @@ For each sample, check that the meaning is preserved, the explanation is reasona
 ## Nuance chat (Phase 2)
 
 1. After ja → en for `やっとの思いで家に帰り着いた。`, ask 「もっと苦労して帰宅したニュアンスにして」 → a new version is created
-2. Ask 「made it と got の違いは？」 → RESULT does not change
+2. Ask 「made it と got の違いは？」 → Result does not change

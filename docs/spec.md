@@ -23,7 +23,7 @@ This document is the single source of truth for **kose**, a Chrome extension for
    - The explanation is a second request. With Chrome built-in AI it runs automatically; with cloud providers it runs when the user presses “Show explanation” (can be made automatic in settings). It is also streamed.
    - The explanation is written in the browser UI language (§1.4) and titled “Explanation”. It lists changes, distinguishes objective errors from optional style improvements, and warns about possible changes of meaning and ambiguities. If no change is needed, kose says so.
    - For long texts (500+ characters or 3+ paragraphs) the explanation also reviews the **structure** (構成): a one-line outline per paragraph and issues with the order of ideas, flow, transitions, repetition, paragraph breaks and the conventions of the situation, each with a suggestion. The rewrite itself never restructures the text. “Create a version that applies the structure suggestions” sends the issues to the chat, which creates a restructured version.
-6. Below that is the chat **“Discuss the nuance”**. With the session's original, rewrite history and situation as context, the user can discuss meaning and wording. When the chat produces a new rewrite, RESULT is updated. Earlier versions can be restored.
+6. Below that is the chat **“Discuss the nuance”**. With the session's original, rewrite history and situation as context, the user can discuss meaning and wording. When the chat produces a new rewrite, Result is updated. Earlier versions can be restored.
 7. At the top (under the header) are the “Mode” (Make it good Japanese / good English, i.e. the target language) and “Situation” dropdowns and a “Apply” (regenerate with these settings) button, enabled only when the dropdowns differ from the displayed version (or, with no version yet, from the last request) and nothing is running. Settings are stored in `chrome.storage.local`. Changing a dropdown does not call the API; regeneration does. The “Mode” value is also the target of the next invocation (item 1).
 8. **There is no "save mistake" button.** Only clear, real grammatical/usage errors are detected and saved locally, automatically (§2). Optional rewording and translation differences are never called "the user's mistakes".
 9. While the rewrite runs, one due mistake may be shown as a quiz (§3).
@@ -65,10 +65,10 @@ The header shows the **source tab** (page title) of the displayed session and a 
 │ Mode [Make it good English ▼]           │
 │ Situation [Technical discussion ▼] [Apply] │
 ├─────────────────────────────────────────┤
-│ ORIGINAL                      123 chars │
+│ Original                      123 chars │
 │ [selected text]                         │
 │ Review while you wait (quiz, §3)        │
-│ RESULT   target · situation · time · cost │
+│ Result   target · situation · time · cost │
 │ [rewrite]                          Copy │
 │ [← Previous | Next →]                   │
 │ Diff (computed locally)                 │
@@ -423,7 +423,7 @@ tests/
 - With the four-path samples in `tests/fixtures`, ja→ja, ja→en, en→ja and en→en work and preserve the meaning (manual evaluation).
 - Nothing is sent to the cloud without an API key, and nothing falls back to the cloud automatically.
 - Invoke in tab1 → invoke in tab2 (review 2 shown) → select tab1 → review 1 is shown. Selecting tab3 without a session changes nothing. Closing tab1 removes review 1.
-- A chat request such as 「もっと苦労して帰宅したニュアンス」 ("make it sound like getting home was hard") updates RESULT; a question alone does not. The context does not leak into the next review in the same tab or into other tabs' sessions.
+- A chat request such as 「もっと苦労して帰宅したニュアンス」 ("make it sound like getting home was hard") updates Result; a question alone does not. The context does not leak into the next review in the same tab or into other tabs' sessions.
 - The objective errors in `We finally had went back to home.` are recorded; running it again marks them as repeated in the explanation and increases the count. Natural rewording, translation, and chat/regeneration rewrites never create mistake cards. Neither full text nor URLs are stored.
 - Mistake cards survive a restart, and the next review date changes according to the rating. With a due card, a new invocation shows it while the rewrite is running and collapses it when streaming starts; with no due card, or for regeneration/chat, nothing is shown.
 

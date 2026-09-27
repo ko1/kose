@@ -60,8 +60,8 @@ const en = {
   },
 
   review: {
-    original: 'ORIGINAL',
-    result: 'RESULT',
+    original: 'Original',
+    result: 'Result',
     chars: (n: number) => `${n} chars`,
     selectionTextNote: 'The selection could not be read directly on this page, so line breaks may be lost.',
     generating: 'Generating…',
@@ -120,8 +120,8 @@ const en = {
     heading: 'Discuss the nuance',
     examples:
       'e.g. “Make it sound like getting home was hard”, “What is the difference between … and …?”. Asking for a change creates a new version.',
-    updated: (n: number) => `↑ RESULT updated to version ${n}`,
-    showVersion: (n: number) => `↑ Show version ${n} in RESULT`,
+    updated: (n: number) => `↑ Result updated to version ${n}`,
+    showVersion: (n: number) => `↑ Show version ${n} as the result`,
     thinking: 'Thinking…',
     resend: 'Send again',
     placeholderDisabled: 'You can ask once the rewrite is done',
@@ -309,8 +309,8 @@ const ja: Messages = {
   },
 
   review: {
-    original: 'ORIGINAL',
-    result: 'RESULT',
+    original: '原文',
+    result: '改稿',
     chars: (n: number) => `${n}字`,
     selectionTextNote: 'このページでは選択範囲を直接読み取れなかったため、改行が失われている可能性があります。',
     generating: '生成中…',
@@ -367,8 +367,8 @@ const ja: Messages = {
   chat: {
     heading: 'ニュアンスを相談',
     examples: '例:「もっと苦労して帰宅したニュアンスにしたい」「〜と〜の違いは？」。書き換えを頼むと新しい案が作られます。',
-    updated: (n: number) => `↑ RESULT を案 ${n} に更新しました`,
-    showVersion: (n: number) => `↑ 案 ${n} を RESULT に表示`,
+    updated: (n: number) => `↑ 改稿を案 ${n} に更新しました`,
+    showVersion: (n: number) => `↑ 案 ${n} を改稿に表示`,
     thinking: '考えています…',
     resend: '送り直す',
     placeholderDisabled: '改稿が終わると相談できます',

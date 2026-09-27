@@ -123,8 +123,8 @@ Also check that the “Technical discussion” situation keeps identifiers and U
 
 ### Nuance chat
 
-1. After a rewrite, ask 「もっと苦労して帰宅したニュアンスにして」 → a new version (“from chat”) is shown in RESULT
-2. Ask a question such as 「went と got の違いは？」 → RESULT does not change
+1. After a rewrite, ask 「もっと苦労して帰宅したニュアンスにして」 → a new version (“from chat”) is shown in Result
+2. Ask a question such as 「went と got の違いは？」 → Result does not change
 3. “← Previous” returns to the earlier version
 4. Run kose on new text in the same tab, or use another tab → the earlier conversation is not carried over
 
