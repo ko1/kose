@@ -578,6 +578,12 @@ describe('KoseController', () => {
     expect(snap().displayed?.status.kind).toBe('idle');
   });
 
+  it('拡張機能の再読み込みで chrome API が消えていても dispose は例外を出さない', async () => {
+    const { controller } = await setup();
+    (globalThis as { chrome?: unknown }).chrome = {};
+    expect(() => controller.dispose()).not.toThrow();
+  });
+
   it('ウィンドウを開き直すとセッションを復元し、実行中だったものは中断扱いにする', async () => {
     const first = await setup();
     await putPending(pending(1, 'done'));

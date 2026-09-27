@@ -104,7 +104,13 @@ export class KoseController {
   }
 
   dispose(): void {
-    for (const d of this.disposers) d();
+    for (const d of this.disposers) {
+      try {
+        d();
+      } catch {
+        // 拡張機能の再読み込みでページが破棄されるときは chrome.* がもう使えない。後片付けなので無視する
+      }
+    }
     for (const a of this.aborts.values()) a.abort();
     for (const a of this.explainAborts.values()) a.abort();
     for (const a of this.chatAborts.values()) a.abort();
