@@ -72,6 +72,8 @@ export interface ControllerSnapshot {
   quizCard: MistakeCard | null;
   /** 今出題できるカード（期限の早い順） */
   dueCards: MistakeCard[];
+  /** 記録済みの間違いすべて（解説で再発を示すのに使う） */
+  cards: readonly MistakeCard[];
 }
 
 /**
@@ -615,6 +617,7 @@ export class KoseController {
       chatState: this.chatStates.get(this.displayedTabId) ?? null,
       quizCard: this.cards.find((c) => c.id === this.quizzes.get(this.displayedTabId)) ?? null,
       dueCards: dueCards(this.cards, Date.now()),
+      cards: this.cards,
     };
     for (const l of this.listeners) l();
   }

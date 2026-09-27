@@ -1,4 +1,4 @@
-import { DAY_MS, initialReview, isDue } from './srs';
+import { initialReview, isDue, lapse } from './srs';
 import type { LanguageCode, MistakeCard, ResultVersion, ReviewSession } from './types';
 
 /** 保存する語句の上限（原文全体を保存しないため） */
@@ -46,7 +46,7 @@ export function extractMistakes(session: ReviewSession, version: ResultVersion):
 
 /**
  * 既存のカードに候補を合わせる。同じ間違いは回数と最終検出時刻を更新し、
- * 次の復習が先なら1日後までに早める（繰り返す間違いは早めに復習する）。
+ * 覚え直しにして1日以内に復習に出す（実際の文章で再発した＝覚えていなかった）。
  */
 export function mergeMistakes(
   cards: readonly MistakeCard[],
@@ -64,13 +64,30 @@ export function mergeMistakes(
         ...card,
         lastSeenAt: now,
         count: card.count + 1,
-        review: { ...card.review, dueAt: Math.min(card.review.dueAt, now + DAY_MS) },
+        review: lapse(card.review, now),
       };
     } else {
       next.push({ id: newId(), key, ...c, createdAt: now, lastSeenAt: now, count: 1, review: initialReview(now) });
     }
   }
   return next;
+}
+
+/**
+ * 解説の変更点が、この案より前に記録済みの間違いか。再発なら「前にも同じ誤り」と表示する。
+ * 同じ言語の校正（原文の言語 = 改稿の言語）のときだけ照合する。
+ */
+export function knownMistake(
+  cards: readonly MistakeCard[],
+  session: ReviewSession,
+  version: ResultVersion,
+  change: { before: string; after: string; type: string },
+): MistakeCard | undefined {
+  const language = session.sourceLanguage;
+  if (change.type !== 'objective_error' || (language !== 'ja' && language !== 'en')) return undefined;
+  if (version.targetLanguage !== language) return undefined;
+  const key = mistakeKey(change.before.trim(), change.after.trim());
+  return cards.find((c) => c.language === language && c.key === key && c.createdAt < version.createdAt);
 }
 
 /** 出題できるカード（期限の早い順） */

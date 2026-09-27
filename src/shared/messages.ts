@@ -113,6 +113,7 @@ const en = {
     applyStructure: 'Create a version that applies the structure suggestions',
     changeTypes: { objective_error: 'Error', style: 'Style', uncertain: 'Check' },
     waitingQuiz: 'Review while you wait',
+    repeated: (count: number) => `You made this before (recorded ${count}×)`,
   },
 
   chat: {
@@ -360,6 +361,7 @@ const ja: Messages = {
     applyStructure: '構成の指摘を反映した案を作る',
     changeTypes: { objective_error: '誤り', style: '改善', uncertain: '要確認' },
     waitingQuiz: '待ち時間に復習',
+    repeated: (count: number) => `前にも同じ誤り（記録 ${count} 回）`,
   },
 
   chat: {

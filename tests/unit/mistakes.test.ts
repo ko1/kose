@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dueCards, extractMistakes, mergeMistakes, mistakeKey } from '../../src/domain/mistakes';
+import { dueCards, extractMistakes, knownMistake, mergeMistakes, mistakeKey } from '../../src/domain/mistakes';
 import { DAY_MS } from '../../src/domain/srs';
 import type { Change, ResultVersion, ReviewSession } from '../../src/domain/types';
 
@@ -96,14 +96,15 @@ describe('mergeMistakes', () => {
     expect(card.review.dueAt).toBe(T0 + DAY_MS);
   });
 
-  it('表記ゆれだけ違う同じ間違いは回数を増やし、先の復習を1日後までに早める', () => {
+  it('表記ゆれだけ違う同じ間違いは回数を増やし、覚え直しにして1日以内に復習に出す', () => {
     const [card] = mergeMistakes([], [cand('had went', 'went')], T0, id);
-    const far = { ...card, review: { ...card.review, dueAt: T0 + 30 * DAY_MS } };
+    const learned = { ...card, review: { dueAt: T0 + 30 * DAY_MS, repetitions: 4, easeFactor: 2.5, intervalDays: 30 } };
     const T1 = T0 + 5 * DAY_MS;
-    const merged = mergeMistakes([far], [cand('Had  Went', 'went')], T1, id);
+    const merged = mergeMistakes([learned], [cand('Had  Went', 'went')], T1, id);
     expect(merged).toHaveLength(1);
     expect(merged[0]).toMatchObject({ id: card.id, count: 2, lastSeenAt: T1 });
-    expect(merged[0].review.dueAt).toBe(T1 + DAY_MS);
+    expect(merged[0].review).toMatchObject({ dueAt: T1 + DAY_MS, repetitions: 0, intervalDays: 0 });
+    expect(merged[0].review.easeFactor).toBeCloseTo(2.3);
   });
 
   it('キーは NFKC・大文字小文字・空白を正規化する', () => {
@@ -117,5 +118,22 @@ describe('mergeMistakes', () => {
     cards[1].review.dueAt = T0 + 1;
     cards[2].review.dueAt = T0 + 100;
     expect(dueCards(cards, T0 + 10).map((c) => c.before)).toEqual(['a2', 'a1']);
+  });
+});
+
+describe('knownMistake', () => {
+  const cards = mergeMistakes([], [{ language: 'en', before: 'had went', after: 'went', explanation: '' }], T0 - 1, () => 'c1');
+  const { session, version } = fixture([change('had went', 'went')]);
+
+  it('この案より前に記録された同じ間違いを返す', () => {
+    expect(knownMistake(cards, session, version, change('Had went', 'went'))?.id).toBe('c1');
+    // この案の解説で初めて記録したカードは再発ではない
+    expect(knownMistake(cards, session, { ...version, createdAt: T0 - 2 }, change('had went', 'went'))).toBeUndefined();
+  });
+
+  it('客観的な誤り以外、翻訳、別の言語では照合しない', () => {
+    expect(knownMistake(cards, session, version, change('had went', 'went', 'style'))).toBeUndefined();
+    expect(knownMistake(cards, session, { ...version, targetLanguage: 'ja' }, change('had went', 'went'))).toBeUndefined();
+    expect(knownMistake(cards, { ...session, sourceLanguage: 'mixed' }, version, change('had went', 'went'))).toBeUndefined();
   });
 });

@@ -444,3 +444,9 @@ button.link {
   margin-top: 12px;
   font-size: 13px;
 }
+
+.badge-repeated {
+  background: var(--warn-bg);
+  color: var(--warn-fg);
+  font-weight: bold;
+}

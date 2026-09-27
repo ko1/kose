@@ -49,6 +49,20 @@ function goodInterval(state: ReviewState): number {
   return Math.max(Math.round(state.intervalDays * state.easeFactor), state.intervalDays + 1);
 }
 
+/**
+ * 実際の文章で同じ間違いをまた検出したとき。覚えていなかったとみなして覚え直しにし、
+ * 1日以内に復習に出す（Again と同じく連続回数と間隔を戻し、易しさを下げる）。
+ */
+export function lapse(state: ReviewState, now: number): ReviewState {
+  return {
+    ...state,
+    repetitions: 0,
+    intervalDays: 0,
+    easeFactor: Math.max(MIN_EASE, state.easeFactor - 0.2),
+    dueAt: Math.min(state.dueAt, now + DAY_MS),
+  };
+}
+
 export function isDue(state: ReviewState, now: number): boolean {
   return state.dueAt <= now;
 }

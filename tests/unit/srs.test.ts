@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AGAIN_DELAY_MS, DAY_MS, initialReview, isDue, rate } from '../../src/domain/srs';
+import { AGAIN_DELAY_MS, DAY_MS, initialReview, isDue, lapse, rate } from '../../src/domain/srs';
 
 const T0 = Date.UTC(2026, 0, 1);
 
@@ -43,5 +43,12 @@ describe('簡易SM-2', () => {
     expect(due('again')).toBeLessThan(due('hard'));
     expect(due('hard')).toBeLessThan(due('good'));
     expect(due('good')).toBeLessThan(due('easy'));
+  });
+
+  it('実際の文章での再発は覚え直しにし、1日以内に出す（先の期限を遅らせない）', () => {
+    const learned = { dueAt: T0 + 30 * DAY_MS, repetitions: 4, easeFactor: 1.4, intervalDays: 30 };
+    expect(lapse(learned, T0)).toMatchObject({ dueAt: T0 + DAY_MS, repetitions: 0, intervalDays: 0, easeFactor: 1.3 });
+    const soon = { ...learned, dueAt: T0 + 60_000 };
+    expect(lapse(soon, T0).dueAt).toBe(T0 + 60_000);
   });
 });

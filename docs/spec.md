@@ -125,7 +125,8 @@ Rarely changed settings live on the options page.
   5. The change comes from the explanation of the rewrite made right after the invocation (`origin: 'initial'`). Rewrites from chat or regeneration reflect the user's requests and are excluded.
   6. `before` and `after` are both non-empty (pure insertions and deletions cannot be quizzed)
   7. Auto-save is on
-- Duplicates within a session and against existing cards are merged, recording frequency and last occurrence. The normalization key is the (`before` → `after`) pair after NFKC, case folding and trimming. Merging must be conservative so different contexts are not merged by mistake. When a known mistake is detected again, its next review is moved up to at most one day later. Cards can be deleted from the list on the options page; they cannot be edited.
+- Duplicates within a session and against existing cards are merged, recording frequency and last occurrence. The normalization key is the (`before` → `after`) pair after NFKC, case folding and trimming. Merging must be conservative so different contexts are not merged by mistake. When a known mistake is detected again in real writing, it counts as forgotten: the card lapses (repetitions and interval reset to 0, ease −0.2, due within one day; `lapse()` in `domain/srs.ts`).
+- **Repeated mistakes are shown in the explanation.** A change of type `objective_error` in same-language proofreading that matches a card recorded before this version (same language and key, `createdAt` earlier than the version) gets a badge “You made this before (recorded N×)” (Japanese UI: 前にも同じ誤り（記録 N 回）). The badge is computed when rendering from the saved cards (`knownMistake()` in `domain/mistakes.ts`); nothing extra is stored or sent to the AI. Cards can be deleted from the list on the options page; they cannot be edited.
 - Stored data: short erroneous phrase, corrected phrase, explanation, language, count, timestamps, review state. Never the full text or the page URL. No error category is stored (the explanation does not classify errors beyond `objective_error`).
 - Storage: mistake cards and settings are in `chrome.storage.local` (key `mistakes`). Both the kose window and the options page read and write the cards and follow each other through `chrome.storage.onChanged`; the data is short phrases only, so it stays small. Corrupt entries are skipped when reading. No sync, no telemetry.
 - Sessions (full review text and chat) are kept in `chrome.storage.session` (in memory, never written to disk), keyed by tab ID. They survive closing and reopening the kose window, but **disappear when the source tab is closed or the browser exits**. The free-input session (tab ID −1) and its draft (`scratchDraft`) disappear when the browser exits. There is no explicit "save" feature.
@@ -137,6 +138,7 @@ Rarely changed settings live on the options page.
 - Spaced repetition uses a **simplified SM-2** (`domain/srs.ts`, independent and unit-tested). Cards have `dueAt`, `lastReviewedAt`, `repetitions`, `easeFactor` (initial 2.5, minimum 1.3), `intervalDays`.
   - A new card is due one day after it was created (never quizzed on the same day).
   - Again: repetitions reset to 0, ease −0.2, due again in 10 minutes.
+  - Detected again in real writing (§2): lapse — repetitions and interval reset to 0, ease −0.2, due within one day.
   - Hard: interval × 1.2 (at least 1 day), ease −0.15.
   - Good: 1 day, then 3 days, then interval × ease (always at least one day longer).
   - Easy: 3 days for a new card, otherwise the Good interval × 1.3 (at least one day longer), ease +0.15.
@@ -422,7 +424,7 @@ tests/
 - Nothing is sent to the cloud without an API key, and nothing falls back to the cloud automatically.
 - Invoke in tab1 → invoke in tab2 (review 2 shown) → select tab1 → review 1 is shown. Selecting tab3 without a session changes nothing. Closing tab1 removes review 1.
 - A chat request such as 「もっと苦労して帰宅したニュアンス」 ("make it sound like getting home was hard") updates RESULT; a question alone does not. The context does not leak into the next review in the same tab or into other tabs' sessions.
-- The objective errors in `We finally had went back to home.` are recorded. Natural rewording, translation, and chat/regeneration rewrites never create mistake cards. Neither full text nor URLs are stored.
+- The objective errors in `We finally had went back to home.` are recorded; running it again marks them as repeated in the explanation and increases the count. Natural rewording, translation, and chat/regeneration rewrites never create mistake cards. Neither full text nor URLs are stored.
 - Mistake cards survive a restart, and the next review date changes according to the rating. With a due card, a new invocation shows it while the rewrite is running and collapses it when streaming starts; with no due card, or for regeneration/chat, nothing is shown.
 
 ### Not implemented
@@ -430,7 +432,7 @@ tests/
 - Apply/Replace (rules in §5.6)
 - A translation-only path with the Chrome Translator API
 - A model selector in the kose window
-- Custom situations, more languages, saving translation expressions, learning statistics, discussing quiz answers with the AI, a due-count badge on the toolbar icon, a "same mistake again" note in the explanation
+- Custom situations, more languages, saving translation expressions, learning statistics, discussing quiz answers with the AI, a due-count badge on the toolbar icon
 
 ## 8. Quality and verification
 

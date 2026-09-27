@@ -11,7 +11,7 @@ A personal Chrome extension that turns text you select on a web page into good J
   2. The explanation (changes with error/style classification and reasons in your browser's language, plus meaning/nuance warnings) is a second request — automatic with Chrome's built-in AI, on demand (“Show explanation”) with cloud providers
 - **Structure review** for long texts (500+ characters or 3+ paragraphs): the explanation adds an outline of each paragraph and points out problems in order, flow, transitions, repetition and paragraph breaks. It only points things out; “Create a version that applies the structure suggestions” sends the issues to the chat to get a restructured version.
 - **Nuance chat** (“Discuss the nuance”): ask about wording or request changes ("make it sound like getting home was hard"). A requested change becomes a new version of the result; plain questions never change it. Each review has its own conversation.
-- **Mistake notes**: when proofreading in the same language (ja→ja, en→en), objective grammar/usage errors from the explanation are saved automatically as short phrase pairs (never the full text or URL). They are recorded only when an explanation is generated (with cloud providers: “Show explanation” or auto-explanation on). View, delete, clear and export/import them on the options page.
+- **Mistake notes**: when proofreading in the same language (ja→ja, en→en), objective grammar/usage errors from the explanation are saved automatically as short phrase pairs (never the full text or URL). They are recorded only when an explanation is generated (with cloud providers: “Show explanation” or auto-explanation on). When you make a recorded mistake again, the explanation marks it “You made this before (recorded N×)” and the card comes back for review within a day. View, delete, clear and export/import them on the options page.
 - **Review quiz**: while you wait for a rewrite, one due mistake is shown as a quiz (fix it → “Show answer” → rate Again / Hard / Good / Easy). The “Review N” button in the window header reviews all due mistakes. Scheduling is a simplified SM-2; a new mistake first comes up the next day.
 - **Free input** (“✏️ Free input”): write text directly in the kose window and run kose on it with Ctrl+Enter — handy for text that is not on a page yet. It opens when you invoke kose with nothing selected
 - One review per browser tab; the kose window follows the active tab
@@ -131,7 +131,7 @@ Also check that the “Technical discussion” situation keeps identifiers and U
 ### Mistake notes and review quiz
 
 1. With “Make it good English”, run kose on `We finally had went back to home.` → after the explanation, the options page lists `had went → went` (and similar objective errors) under “Mistake notes and review”
-2. Translating (ja → en), regenerating or chat rewrites add nothing; running the same sentence again increases the count instead of adding a card
+2. Translating (ja → en), regenerating or chat rewrites add nothing; running the same sentence again shows “You made this before (recorded 2×)” in the explanation and increases the count instead of adding a card
 3. A new mistake is not quizzed on the same day. To test sooner, export the JSON, set `review.dueAt` to a past time, clear and import it again
 4. With a due mistake, run kose → “Review while you wait” appears while the rewrite is running and folds up when the result arrives; rating it moves “next review” on the options page
 5. “Review N” in the header goes through all due mistakes; running kose again returns to the review

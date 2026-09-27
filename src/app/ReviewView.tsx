@@ -4,7 +4,9 @@ import { diffTexts } from '../domain/diff';
 import { currentVersion } from '../domain/session';
 import { countChars } from '../domain/text';
 import { structureApplyMessage } from '../domain/structure';
+import { knownMistake } from '../domain/mistakes';
 import type {
+  Change,
   ChangeType,
   MistakeCard,
   PartialExplanation,
@@ -36,6 +38,8 @@ interface Props {
   onRetryChat: () => void;
   /** この実行の待ち時間に出す復習クイズ */
   quizCard: MistakeCard | null;
+  /** 記録済みの間違い（解説で再発を示す） */
+  cards: readonly MistakeCard[];
   onRateCard: (cardId: string, rating: Rating) => void;
 }
 
@@ -55,6 +59,7 @@ export function ReviewView({
   onRetryChat,
   quizCard,
   onRateCard,
+  cards,
 }: Props) {
   const version = currentVersion(session);
   // 生成中は途中の改稿文を、前の案の代わりに表示する
@@ -106,6 +111,7 @@ export function ReviewView({
             state={explainStates[version.id]}
             external={external}
             onExplain={() => onExplain(version.id)}
+            knownMistake={(c) => knownMistake(cards, session, version, c)}
             onApplyStructure={
               session.status.kind === 'running' || chatState?.kind === 'running'
                 ? undefined
@@ -338,10 +344,13 @@ function ExplanationSection({
   state,
   external,
   onExplain,
+  knownMistake,
   onApplyStructure,
 }: {
   version: ResultVersion;
   state: ExplainState | undefined;
+  /** 変更点が記録済みの間違いの再発なら、そのカード */
+  knownMistake: (change: Change) => MistakeCard | undefined;
   /** クラウドへ送信するプロバイダーか（ボタンに費用がかかることを示す） */
   external: boolean;
   onExplain: () => void;
@@ -362,7 +371,7 @@ function ExplanationSection({
             </span>
           )}
         </summary>
-        <ExplanationBody explanation={explanation} onApplyStructure={onApplyStructure} />
+        <ExplanationBody explanation={explanation} knownMistake={knownMistake} onApplyStructure={onApplyStructure} />
         {explanation.droppedChanges > 0 && (
           <p className="note">{M.review.droppedChanges(explanation.droppedChanges)}</p>
         )}
@@ -398,9 +407,11 @@ function ExplanationSection({
 /** 解説の本文。生成途中（一部の項目だけ）でも表示できる */
 function ExplanationBody({
   explanation,
+  knownMistake,
   onApplyStructure,
 }: {
   explanation: PartialExplanation;
+  knownMistake?: (change: Change) => MistakeCard | undefined;
   onApplyStructure?: (issues: StructureReview['issues']) => void;
 }) {
   const { explanation: overall, changes = [], nuanceWarnings = [], structure } = explanation;
@@ -414,16 +425,20 @@ function ExplanationBody({
         <>
           <h3>{M.review.changes}</h3>
           <ul className="changes">
-            {changes.map((c, i) => (
-              <li key={i}>
-                <span className={`badge badge-${c.type}`}>{CHANGE_TYPE_LABELS[c.type]}</span>
-                <span className="change-pair">
-                  {c.before ? <del>{c.before}</del> : <em>{M.review.added}</em>} →{' '}
-                  {c.after ? <ins>{c.after}</ins> : <em>{M.review.removed}</em>}
-                </span>
-                <p className="change-explanation">{c.explanation}</p>
-              </li>
-            ))}
+            {changes.map((c, i) => {
+              const known = knownMistake?.(c);
+              return (
+                <li key={i}>
+                  <span className={`badge badge-${c.type}`}>{CHANGE_TYPE_LABELS[c.type]}</span>
+                  {known && <span className="badge badge-repeated">{M.review.repeated(known.count)}</span>}
+                  <span className="change-pair">
+                    {c.before ? <del>{c.before}</del> : <em>{M.review.added}</em>} →{' '}
+                    {c.after ? <ins>{c.after}</ins> : <em>{M.review.removed}</em>}
+                  </span>
+                  <p className="change-explanation">{c.explanation}</p>
+                </li>
+              );
+            })}
           </ul>
         </>
       )}

@@ -638,6 +638,17 @@ describe('KoseController', () => {
       expect(snap().dueCards).toEqual([]);
     });
 
+    it('同じ間違いをまた検出すると回数を増やし、再発として公開する', async () => {
+      const { provider, snap } = await setup();
+      await proofread(provider, 1, snap);
+      await proofread(provider, 1, snap);
+      const cards = await loadMistakes();
+      expect(cards).toHaveLength(1);
+      expect(cards[0].count).toBe(2);
+      expect(cards[0].review.repetitions).toBe(0);
+      expect(snap().cards.map((c) => c.count)).toEqual([2]);
+    });
+
     it('自動記録をオフにすると記録しない', async () => {
       await saveSettings({ autoSaveMistakes: false });
       const { provider, snap } = await setup();

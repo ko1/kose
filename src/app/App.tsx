@@ -83,6 +83,7 @@ export function App({ controller }: { controller: KoseController }) {
                 onRetryChat={() => controller.retryChat(displayed.source.tabId)}
                 quizCard={quizCard}
                 onRateCard={(id, rating) => controller.rateCard(id, rating)}
+                cards={snapshot.cards}
                 debugJson={() =>
                   buildDebugExport(displayed, settings, {
                     extensionVersion: chrome.runtime.getManifest().version,
