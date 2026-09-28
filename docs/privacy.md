@@ -17,10 +17,13 @@ kose is a Chrome extension that rewrites text you select into good Japanese or g
 | Chrome built-in AI (default) | Nothing leaves your device. Processing runs in Chrome on your computer. | — |
 | Claude (Anthropic API) | The text you run kose on, its rewrites, the chosen mode and situation, your nuance-chat messages, and the language for explanations | `api.anthropic.com`, using your own API key |
 | OpenAI API | Same as above | `api.openai.com`, using your own API key |
+| Gemini API (Google) | Same as above | `generativelanguage.googleapis.com`, using your own API key. On Google's free tier, Google may use the content to improve its products. |
+| OpenRouter | Same as above | `openrouter.ai`, using your OpenRouter key; OpenRouter forwards it to the provider of the model you choose |
+| Ollama | Same as above | Ollama on your own computer (`localhost` / `127.0.0.1`); nothing leaves your computer |
 
 - Data is sent only when you run kose, press “Show explanation”, send a chat message, or enable automatic explanations for cloud providers.
 - The page URL is never sent. Text on the page outside your selection is never sent.
-- The provider handles the data under its own terms and privacy policy ([Anthropic](https://www.anthropic.com/legal/privacy), [OpenAI](https://openai.com/policies/privacy-policy)). You are billed by the provider for your API usage.
+- The provider handles the data under its own terms and privacy policy ([Anthropic](https://www.anthropic.com/legal/privacy), [OpenAI](https://openai.com/policies/privacy-policy), [Google](https://ai.google.dev/gemini-api/terms), [OpenRouter](https://openrouter.ai/privacy)). You are billed by the provider for your API usage.
 - kose never switches to a cloud provider automatically.
 
 ## What is stored in your browser
@@ -41,7 +44,8 @@ kose is a Chrome extension that rewrites text you select into good Japanese or g
 - `clipboardRead`: read the clipboard only when you open kose's launch page (`launch.html`, e.g. from a Windows shortcut) to run kose on text copied in another application. The text is handled like free input.
 - `contextMenus`: the right-click menu item.
 - `storage`: the data described above.
-- `https://api.anthropic.com/*`, `https://api.openai.com/*` (optional): requested only when you select that provider, and removed when you switch away.
+- `https://api.anthropic.com/*`, `https://api.openai.com/*`, `https://generativelanguage.googleapis.com/*`, `https://openrouter.ai/*`, `http://localhost/*`, `http://127.0.0.1/*` (optional): requested only when you select that provider (the last two for Ollama), and removed when you switch away.
+- `identity`: only for “Log in with OpenRouter”, to open OpenRouter's login page and receive the API key it issues.
 
 ## Contact
 
@@ -68,10 +72,13 @@ kose は、選択した文章をよい日本語・よい英語に改善する Ch
 | Chrome 内蔵 AI（既定） | 端末の外には何も送りません。お使いのパソコンの Chrome の中で処理します。 | — |
 | Claude（Anthropic API） | kose にかけた文章、改稿文、選んだ機能と用途、ニュアンス相談のメッセージ、解説に使う言語 | `api.anthropic.com`（あなた自身の API キーを使用） |
 | OpenAI API | 同上 | `api.openai.com`（あなた自身の API キーを使用） |
+| Gemini API（Google） | 同上 | `generativelanguage.googleapis.com`（あなた自身の API キーを使用）。Google の無料枠では、送った内容が Google の製品改善に使われることがあります。 |
+| OpenRouter | 同上 | `openrouter.ai`（あなたの OpenRouter のキーを使用）。OpenRouter が、選んだモデルの提供元に転送します |
+| Ollama | 同上 | あなたのパソコンの Ollama（`localhost` / `127.0.0.1`）。パソコンの外には出ません |
 
 - 送信するのは、kose を実行したとき、「解説を見る」を押したとき、相談を送ったとき、クラウドでの解説の自動生成をオンにしているときだけです。
 - ページの URL は送りません。選択範囲以外のページの文章も送りません。
-- 送信したデータは、各事業者の規約とプライバシーポリシー（[Anthropic](https://www.anthropic.com/legal/privacy)、[OpenAI](https://openai.com/policies/privacy-policy)）に従って扱われます。API の利用料金は各事業者からあなたに請求されます。
+- 送信したデータは、各事業者の規約とプライバシーポリシー（[Anthropic](https://www.anthropic.com/legal/privacy)、[OpenAI](https://openai.com/policies/privacy-policy)、[Google](https://ai.google.dev/gemini-api/terms)、[OpenRouter](https://openrouter.ai/privacy)）に従って扱われます。API の利用料金は各事業者からあなたに請求されます。
 - kose が自動でクラウドの AI に切り替えることはありません。
 
 ## ブラウザーに保存するもの
@@ -92,7 +99,8 @@ kose は、選択した文章をよい日本語・よい英語に改善する Ch
 - `clipboardRead`：kose の起動用ページ（`launch.html`。Windows のショートカットなどから開く）を開いたときだけ、ほかのアプリでコピーした文章を読み取ります。読み取った文章は自由入力と同じように扱います。
 - `contextMenus`：右クリックメニューの項目です。
 - `storage`：上に書いたデータの保存です。
-- `https://api.anthropic.com/*`、`https://api.openai.com/*`（任意）：その AI を選んだときだけ許可を求め、選択をやめると許可を返します。
+- `https://api.anthropic.com/*`、`https://api.openai.com/*`、`https://generativelanguage.googleapis.com/*`、`https://openrouter.ai/*`、`http://localhost/*`、`http://127.0.0.1/*`（任意）：その AI を選んだときだけ許可を求め（最後の2つは Ollama 用）、選択をやめると許可を返します。
+- `identity`：「OpenRouter でログイン」のときだけ、OpenRouter のログイン画面を開いて、発行された API キーを受け取るために使います。
 
 ## お問い合わせ
 

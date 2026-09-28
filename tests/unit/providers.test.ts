@@ -1,7 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 import { BuiltinProvider, builtinExplanationLanguage, languageOptions } from '../../src/ai/builtinProvider';
 import { createProvider } from '../../src/ai/factory';
-import { OPENAI_ORIGIN, OpenAIProvider } from '../../src/ai/openaiProvider';
+import {
+  GEMINI_SPEC,
+  OPENAI_ORIGIN,
+  OPENAI_SPEC,
+  OpenAICompatibleProvider,
+  OPENROUTER_SPEC,
+  ollamaSpec,
+  resetSchemaSupport,
+} from '../../src/ai/openaiProvider';
 import { DEFAULT_SETTINGS } from '../../src/storage/settings';
 import { fakeChrome } from '../fakeChrome';
 
@@ -189,8 +197,13 @@ describe('BuiltinProvider', () => {
   });
 });
 
-describe('OpenAIProvider', () => {
+describe('OpenAICompatibleProvider (OpenAI)', () => {
   const config = { apiKey: 'sk-test', model: 'test-model', maxInputChars: 10 };
+  const OpenAIProvider = class extends OpenAICompatibleProvider {
+    constructor(c: typeof config, fetchImpl?: typeof fetch) {
+      super(OPENAI_SPEC, c, fetchImpl);
+    }
+  };
 
   it('APIキー未設定なら利用不可', async () => {
     const p = new OpenAIProvider({ ...config, apiKey: '' });
@@ -250,9 +263,87 @@ describe('OpenAIProvider', () => {
   });
 });
 
+describe('OpenAICompatibleProvider (Gemini / OpenRouter / Ollama)', () => {
+  const config = { apiKey: 'key', model: 'm', maxInputChars: 100 };
+  const ok = (body: unknown) => new Response(JSON.stringify(body), { status: 200 });
+
+  it('Gemini は OpenAI 互換のエンドポイントにキーを付けて問い合わせる', async () => {
+    const fetchImpl = vi.fn(async () => ok({ choices: [{ message: { content: output } }] }));
+    await new OpenAICompatibleProvider(GEMINI_SPEC, config, fetchImpl).rewrite(request);
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions');
+    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer key');
+  });
+
+  it('OpenRouter は対応する接続先に振り分けるよう指定し、返ってきた料金を記録する', async () => {
+    const fetchImpl = vi.fn(async () =>
+      ok({
+        model: 'openai/gpt-5-mini',
+        choices: [{ message: { content: output } }],
+        usage: { prompt_tokens: 120, completion_tokens: 30, cost: 0.00042 },
+      }),
+    );
+    const result = await new OpenAICompatibleProvider(OPENROUTER_SPEC, config, fetchImpl).rewrite(request);
+    const [, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    const body = JSON.parse(init.body as string);
+    expect(body.provider).toEqual({ require_parameters: true });
+    expect(body.usage).toEqual({ include: true });
+    expect((init.headers as Record<string, string>)['X-Title']).toBe('kose');
+    expect(result.usage).toEqual({ model: 'openai/gpt-5-mini', inputTokens: 120, outputTokens: 30, costUsd: 0.00042 });
+  });
+
+  it('Ollama はキー不要・外部送信なしで、設定の URL に問い合わせる', async () => {
+    const spec = ollamaSpec('http://127.0.0.1:11434');
+    expect(spec).toMatchObject({ origin: 'http://127.0.0.1/*', host: '127.0.0.1:11434', sendsExternally: false });
+    const p = new OpenAICompatibleProvider(spec, { ...config, apiKey: '' }, vi.fn(async () => ok({ choices: [{ message: { content: output } }] })));
+    expect(p.sendsExternally).toBe(false);
+    fakeChrome().permissions.granted.add('http://127.0.0.1/*');
+    expect(await p.availability('en')).toEqual({ kind: 'available' });
+  });
+
+  it('Ollama が拡張機能からの接続を拒否したら OLLAMA_ORIGINS の設定を案内する。起動していなければその旨', async () => {
+    const forbidden = vi.fn(async () => new Response('', { status: 403 }));
+    await expect(new OpenAICompatibleProvider(ollamaSpec('http://localhost:11434'), config, forbidden).rewrite(request)).rejects.toThrow(
+      /OLLAMA_ORIGINS/,
+    );
+    const down = vi.fn(async () => {
+      throw new TypeError('Failed to fetch');
+    });
+    await expect(new OpenAICompatibleProvider(ollamaSpec('http://localhost:11434'), config, down).rewrite(request)).rejects.toThrow(
+      /running/,
+    );
+  });
+
+  it('JSON Schema に対応していなければ JSON モードで1回やり直し、以後は JSON モードで問い合わせる', async () => {
+    resetSchemaSupport();
+    const formats: string[] = [];
+    const fetchImpl = vi.fn(async (_url: string, init: RequestInit) => {
+      const format = JSON.parse(init.body as string).response_format.type;
+      formats.push(format);
+      return format === 'json_schema'
+        ? new Response(JSON.stringify({ error: { message: 'Unknown name "additionalProperties"' } }), { status: 400 })
+        : ok({ choices: [{ message: { content: output } }] });
+    });
+    const p = new OpenAICompatibleProvider(GEMINI_SPEC, config, fetchImpl as unknown as typeof fetch);
+    expect((await p.rewrite(request)).revisedText).toBe('Hello.');
+    await p.rewrite(request);
+    expect(formats).toEqual(['json_schema', 'json_object', 'json_object']);
+  });
+
+  it('402 はクレジット不足として報告する', async () => {
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ error: { message: 'Insufficient credits' } }), { status: 402 }));
+    await expect(new OpenAICompatibleProvider(OPENROUTER_SPEC, config, fetchImpl).rewrite(request)).rejects.toThrow(
+      /Not enough OpenRouter credits/,
+    );
+  });
+});
+
 describe('createProvider', () => {
   it('設定で選ばれたプロバイダーだけを作る', () => {
     expect(createProvider(DEFAULT_SETTINGS).id).toBe('builtin');
-    expect(createProvider({ ...DEFAULT_SETTINGS, provider: 'openai' }).id).toBe('openai');
+    for (const id of ['anthropic', 'openai', 'gemini', 'openrouter', 'ollama'] as const) {
+      expect(createProvider({ ...DEFAULT_SETTINGS, provider: id }).id).toBe(id);
+    }
+    expect(createProvider({ ...DEFAULT_SETTINGS, provider: 'ollama' }).sendsExternally).toBe(false);
   });
 });

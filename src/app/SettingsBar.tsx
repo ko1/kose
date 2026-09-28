@@ -60,19 +60,32 @@ export function ProviderFooter({ settings }: { settings: Settings }) {
   return (
     <footer className="footer">
       <div className="provider">
-        {settings.provider === 'openai' ? (
-          <span className="external">{M.settingsBar.externalOpenAI(settings.openaiModel)}</span>
-        ) : settings.provider === 'anthropic' ? (
-          <span className="external">
-            {M.settingsBar.externalAnthropic(settings.anthropicModel, settings.anthropicExplainModel)}
-          </span>
-        ) : (
-          <span>{M.settingsBar.local}</span>
-        )}
+        <ProviderLabel settings={settings} />
         <button className="link" onClick={() => chrome.runtime.openOptionsPage()} title={M.settingsBar.settingsTitle}>
           {M.settingsBar.settings}
         </button>
       </div>
     </footer>
   );
+}
+
+function ProviderLabel({ settings }: { settings: Settings }) {
+  switch (settings.provider) {
+    case 'builtin':
+      return <span>{M.settingsBar.local}</span>;
+    case 'ollama':
+      return <span>{M.settingsBar.localOllama(settings.ollamaModel)}</span>;
+    case 'anthropic':
+      return (
+        <span className="external">
+          {M.settingsBar.externalAnthropic(settings.anthropicModel, settings.anthropicExplainModel)}
+        </span>
+      );
+    case 'openai':
+      return <span className="external">{M.settingsBar.external('OpenAI', settings.openaiModel)}</span>;
+    case 'gemini':
+      return <span className="external">{M.settingsBar.external('Gemini', settings.geminiModel)}</span>;
+    case 'openrouter':
+      return <span className="external">{M.settingsBar.external('OpenRouter', settings.openrouterModel)}</span>;
+  }
 }

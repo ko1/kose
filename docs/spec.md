@@ -179,11 +179,21 @@ Explanations run automatically for providers that do not send data externally (t
 - `refusal` and `max_tokens` stop reasons are reported as errors.
 - The cost of each request is computed from the returned token usage and a price table, and shown in the UI in USD (two significant digits, e.g. `$0.0015`). Dated model IDs in responses (e.g. `claude-haiku-4-5-20251001`) are matched by prefix.
 
-#### OpenAI API
+#### OpenAI-compatible providers: OpenAI, Gemini, OpenRouter, Ollama
 
-- `optional_host_permissions: ["https://api.openai.com/*"]`, requested when OpenAI is selected. Users of the built-in AI only are never granted external host permissions.
-- Model is configurable (default in code). Structured Outputs (`json_schema`, strict). No streaming.
-- API keys are stored in `chrome.storage.local`; the README states that this is not secure storage.
+One implementation (`OpenAICompatibleProvider` in `ai/openaiProvider.ts`) calls the Chat Completions API (`/chat/completions`) of all four; a `CompatibleSpec` describes each one's endpoint, permission origin, whether a key is needed, whether data leaves the device, and extra headers / body. No streaming.
+
+| Provider | Endpoint | Key | Notes |
+| --- | --- | --- | --- |
+| OpenAI | `api.openai.com/v1` | yes | default model `gpt-5-mini` |
+| Gemini | `generativelanguage.googleapis.com/v1beta/openai` | yes (Google AI Studio) | default `gemini-2.5-flash`; free tier (content may be used by Google to improve products) |
+| OpenRouter | `openrouter.ai/api/v1` | yes, or “Log in with OpenRouter” | default `openai/gpt-5-mini`; `provider.require_parameters` so requests go only to endpoints that support structured output; `usage.include` so the response carries the cost (USD), which is shown like Claude's |
+| Ollama | `<server URL>/v1` (default `http://localhost:11434`) | no | local, `sendsExternally: false` (explanations run automatically); only localhost / 127.0.0.1 can be allowed; a 403 means `OLLAMA_ORIGINS=chrome-extension://*` is needed, a connection error means Ollama is not running |
+
+- Output is requested with Structured Outputs (`response_format: json_schema`, strict). If an endpoint/model rejects the schema (400/404), kose retries once with `json_object` and remembers that for the endpoint and model; the prompts list the output fields and the result is validated with Zod either way.
+- Each host is an optional host permission requested when the provider is selected and removed when switching away. Users of the built-in AI only are never granted external host permissions.
+- **Log in with OpenRouter** (OAuth PKCE, `ai/openrouterAuth.ts`): `chrome.identity.launchWebAuthFlow` opens `openrouter.ai/auth` with the callback `https://<extension ID>.chromiumapp.org/` and an S256 code challenge; the returned code is exchanged for an API key at `openrouter.ai/api/v1/auth/keys`, which is saved like a pasted key. No server and no client registration are needed. Requires the `identity` permission.
+- API keys are stored in `chrome.storage.local`; the README states that this is not secure storage. The debug JSON replaces every `…ApiKey` setting with `…ApiKeySet`.
 
 The Chrome Translator API is not used. Built-in API availability is tested on real hardware; supported languages and environments are never assumed.
 
@@ -350,7 +360,7 @@ interface AIProvider {
 ### 5.1 Basics
 
 - MV3, TypeScript, Vite, React, Vitest, Zod.
-- Permissions: `contextMenus`, `storage`, `activeTab`, `scripting`, `clipboardRead` (only used by `launch.html`). `optional_host_permissions`: Anthropic and OpenAI. No always-on `<all_urls>` content scripts. No `sidePanel`. The shortcut uses `commands` (no permission needed).
+- Permissions: `contextMenus`, `storage`, `activeTab`, `scripting`, `clipboardRead` (only used by `launch.html`), `identity` (only for “Log in with OpenRouter”). `optional_host_permissions`: Anthropic, OpenAI, Gemini, OpenRouter, `http://localhost/*` and `http://127.0.0.1/*` (Ollama). No always-on `<all_urls>` content scripts. No `sidePanel`. The shortcut uses `commands` (no permission needed).
 - `"incognito": "not_allowed"`.
 - `minimum_chrome_version`: 138 (Prompt API for extensions).
 - Model output is rendered as text, never injected as HTML.

@@ -9,7 +9,7 @@ import type {
   RewriteResult,
 } from '../domain/types';
 
-export type ProviderId = 'builtin' | 'openai' | 'anthropic';
+export type ProviderId = 'builtin' | 'anthropic' | 'openai' | 'gemini' | 'openrouter' | 'ollama';
 
 export type ProviderAvailability =
   | { kind: 'available' }

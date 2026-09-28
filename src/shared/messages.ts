@@ -37,7 +37,8 @@ const en = {
     situation: 'Situation',
     apply: 'Apply',
     applyTitle: 'Rewrite the same original when the mode or situation differs from the displayed version',
-    externalOpenAI: (model: string) => `Sent externally: OpenAI (${model})`,
+    external: (name: string, model: string) => `Sent externally: ${name} (${model})`,
+    localOllama: (model: string) => `AI: local (Ollama ${model})`,
     externalAnthropic: (model: string, explainModel: string) =>
       `Sent externally: Anthropic (rewrite ${model} / explanation & chat ${explainModel})`,
     local: 'AI: local (Chrome built-in)',
@@ -155,13 +156,21 @@ const en = {
     invalidShape: 'The AI response was not in the expected format.',
     noRewrite: 'The AI response did not contain a rewrite.',
     noReply: 'The AI response did not contain a reply.',
-    openaiNoKey: 'No OpenAI API key is set. Enter it on the settings page.',
-    openaiNoPermission: 'Access to api.openai.com is not allowed. Select OpenAI again on the settings page and allow it.',
+    noKey: (name: string) => `No ${name} API key is set. Enter it on the settings page.`,
+    noPermission: (host: string, name: string) =>
+      `Access to ${host} is not allowed. Allow it for ${name} on the settings page.`,
     refused: (reason: string) => `The AI declined to process this: ${reason}`,
     empty: 'The AI response was empty.',
-    openaiInvalidKey: 'The OpenAI API key is invalid. Check it on the settings page.',
-    openaiRateLimit: (detail: string) => `The OpenAI API usage limit was reached, or it is busy. ${detail}`.trim(),
-    openaiError: (status: number, detail: string) => `OpenAI API error (${status}) ${detail}`.trim(),
+    invalidKey: (name: string) => `The ${name} API key is invalid. Check it on the settings page.`,
+    rateLimit: (name: string, detail: string) => `The ${name} usage limit was reached, or it is busy. ${detail}`.trim(),
+    noCredits: (name: string, detail: string) => `Not enough ${name} credits. ${detail}`.trim(),
+    httpError: (name: string, status: number, detail: string) => `${name} API error (${status}) ${detail}`.trim(),
+    connectFailed: (name: string, host: string, local: boolean) =>
+      local
+        ? `Could not connect to ${name} at ${host}. Make sure it is running.`
+        : `Could not connect to ${name} (${host}). Check your network.`,
+    ollamaForbidden:
+      'Ollama refused the request from the extension. Set the environment variable OLLAMA_ORIGINS=chrome-extension://* and restart Ollama.',
     builtinUnavailable:
       'Built-in AI (Prompt API) is not available in this Chrome. Check the Chrome version and requirements.',
     builtinCheckFailed: (message: string) => `Could not check whether built-in AI is available: ${message}`,
@@ -191,6 +200,22 @@ const en = {
     builtin: 'Local (Chrome built-in AI)',
     builtinNote: 'Text is not sent outside the browser.',
     claude: 'Claude (Anthropic API)',
+    gemini: 'Gemini API (Google)',
+    openrouter: 'OpenRouter (Claude, GPT, Gemini, … with one account)',
+    ollama: 'Ollama (local AI on this computer)',
+    geminiNote:
+      'Get an API key at Google AI Studio (aistudio.google.com). There is a free tier; on the free tier Google may use the content to improve its products.',
+    openrouterNote:
+      'Log in with OpenRouter to get a key without copying it. Usage is paid from your OpenRouter credits; OpenRouter forwards the text to the model’s provider.',
+    openrouterLogin: 'Log in with OpenRouter',
+    openrouterLoginNote: 'Opens OpenRouter; after you allow it, the API key is saved here.',
+    openrouterLoggedIn: 'Logged in to OpenRouter. The API key was saved.',
+    openrouterLoginFailed: 'Could not log in to OpenRouter.',
+    openrouterModelHint: 'Model ID as listed on openrouter.ai/models, e.g. openai/gpt-5-mini, anthropic/claude-sonnet-5, google/gemini-2.5-flash.',
+    ollamaNote:
+      'Text is sent to Ollama running on this computer and does not leave it. Install Ollama, pull a model (e.g. ollama pull qwen3), and set the environment variable OLLAMA_ORIGINS=chrome-extension://* so the extension can connect.',
+    serverUrl: 'Server URL',
+    ollamaModelHint: 'A model you have pulled in Ollama. Only localhost / 127.0.0.1 can be used as the server.',
     /** before / after the API host */
     sentTo: ['Selected text is sent to', '. Usage is billed to your own API key.'],
     openai: 'OpenAI API',
@@ -300,7 +325,8 @@ const ja: Messages = {
     situation: '用途',
     apply: '変更',
     applyTitle: '表示中の案と機能・用途が違うときに、同じ原文から作り直します',
-    externalOpenAI: (model: string) => `外部送信: OpenAI（${model}）`,
+    external: (name: string, model: string) => `外部送信: ${name}（${model}）`,
+    localOllama: (model: string) => `AI: ローカル（Ollama ${model}）`,
     externalAnthropic: (model: string, explainModel: string) =>
       `外部送信: Anthropic（改稿 ${model} / 解説・相談 ${explainModel}）`,
     local: 'AI: ローカル（Chrome内蔵）',
@@ -416,13 +442,21 @@ const ja: Messages = {
     invalidShape: 'AIの応答が想定した形式ではありませんでした。',
     noRewrite: 'AIの応答に改稿文が含まれていませんでした。',
     noReply: 'AIの応答に返答が含まれていませんでした。',
-    openaiNoKey: 'OpenAI APIキーが設定されていません。設定画面で入力してください。',
-    openaiNoPermission: 'api.openai.com への接続が許可されていません。設定画面でOpenAIを選び直して許可してください。',
+    noKey: (name: string) => `${name} のAPIキーが設定されていません。設定画面で入力してください。`,
+    noPermission: (host: string, name: string) =>
+      `${host} への接続が許可されていません。設定画面で ${name} の接続を許可してください。`,
     refused: (reason: string) => `AIが処理を断りました: ${reason}`,
     empty: 'AIの応答が空でした。',
-    openaiInvalidKey: 'OpenAI APIキーが無効です。設定画面で確認してください。',
-    openaiRateLimit: (detail: string) => `OpenAI APIの利用上限に達したか、混雑しています。${detail}`,
-    openaiError: (status: number, detail: string) => `OpenAI APIエラー (${status}) ${detail}`.trim(),
+    invalidKey: (name: string) => `${name} のAPIキーが無効です。設定画面で確認してください。`,
+    rateLimit: (name: string, detail: string) => `${name} の利用上限に達したか、混雑しています。${detail}`.trim(),
+    noCredits: (name: string, detail: string) => `${name} のクレジットが足りません。${detail}`.trim(),
+    httpError: (name: string, status: number, detail: string) => `${name} APIエラー (${status}) ${detail}`.trim(),
+    connectFailed: (name: string, host: string, local: boolean) =>
+      local
+        ? `${host} の ${name} に接続できませんでした。起動しているか確認してください。`
+        : `${name}（${host}）に接続できませんでした。ネットワークを確認してください。`,
+    ollamaForbidden:
+      'Ollama が拡張機能からの接続を拒否しました。環境変数 OLLAMA_ORIGINS=chrome-extension://* を設定して Ollama を再起動してください。',
     builtinUnavailable: 'このChromeではBuilt-in AI（Prompt API）が利用できません。Chromeのバージョンと動作要件を確認してください。',
     builtinCheckFailed: (message: string) => `Built-in AIの利用可否を確認できませんでした: ${message}`,
     builtinUnsupported:
@@ -450,6 +484,22 @@ const ja: Messages = {
     builtin: 'ローカル（Chrome内蔵AI）',
     builtinNote: '文章は外部に送信されません。',
     claude: 'Claude（Anthropic API）',
+    gemini: 'Gemini API（Google）',
+    openrouter: 'OpenRouter（Claude・GPT・Gemini などを1つのアカウントで）',
+    ollama: 'Ollama（このパソコンで動くローカルAI）',
+    geminiNote:
+      'API キーは Google AI Studio（aistudio.google.com）で取得します。無料枠があります。無料枠では、送った内容が Google の製品改善に使われることがあります。',
+    openrouterNote:
+      '「OpenRouter でログイン」なら、キーをコピーせずに設定できます。料金は OpenRouter のクレジットから支払われ、文章は OpenRouter を経由して各モデルの提供元に送られます。',
+    openrouterLogin: 'OpenRouter でログイン',
+    openrouterLoginNote: 'OpenRouter の画面が開きます。許可すると、ここに API キーが保存されます。',
+    openrouterLoggedIn: 'OpenRouter にログインし、API キーを保存しました。',
+    openrouterLoginFailed: 'OpenRouter にログインできませんでした。',
+    openrouterModelHint: 'openrouter.ai/models に載っているモデル ID（例：openai/gpt-5-mini、anthropic/claude-sonnet-5、google/gemini-2.5-flash）。',
+    ollamaNote:
+      '文章はこのパソコンで動いている Ollama に送られ、外には出ません。Ollama をインストールしてモデルを取得し（例：ollama pull qwen3）、拡張機能から接続できるよう環境変数 OLLAMA_ORIGINS=chrome-extension://* を設定してください。',
+    serverUrl: 'サーバーの URL',
+    ollamaModelHint: 'Ollama に取得済みのモデル名。サーバーには localhost / 127.0.0.1 だけを使えます。',
     sentTo: ['選択した文章が', 'に送信されます。利用料金はご自身のAPIキーに課金されます。'],
     openai: 'OpenAI API',
     notGranted: (host: string, name: string) => `${host} への接続が許可されませんでした。許可するまで${name}は使えません。`,

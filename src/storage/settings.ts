@@ -5,6 +5,13 @@ import { withLock } from './lock';
 export const DEFAULT_OPENAI_MODEL = 'gpt-5-mini';
 export const DEFAULT_ANTHROPIC_MODEL = 'claude-haiku-4-5';
 export const DEFAULT_ANTHROPIC_EXPLAIN_MODEL = 'claude-sonnet-5';
+export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
+export const DEFAULT_OPENROUTER_MODEL = 'openai/gpt-5-mini';
+export const DEFAULT_OLLAMA_MODEL = 'qwen3';
+export const DEFAULT_OLLAMA_URL = 'http://localhost:11434';
+
+export const PROVIDERS = ['builtin', 'anthropic', 'openai', 'gemini', 'openrouter', 'ollama'] as const;
+export type ProviderSetting = (typeof PROVIDERS)[number];
 
 export type ModelTier = 'fast' | 'balanced' | 'best';
 
@@ -16,7 +23,7 @@ export const ANTHROPIC_MODELS: { id: string; name: string; tier: ModelTier; pric
 ];
 
 const settingsSchema = z.object({
-  provider: z.enum(['builtin', 'openai', 'anthropic']).catch('builtin'),
+  provider: z.enum(PROVIDERS).catch('builtin'),
   targetLanguage: z.enum(LANGUAGE_CODES).catch('en'),
   situation: z.enum(SITUATIONS).catch('casual'),
   openaiApiKey: z.string().catch(''),
@@ -29,6 +36,16 @@ const settingsSchema = z.object({
   /** 思考の深さ。校正・翻訳は速さを優先して low を既定にする */
   anthropicEffort: z.enum(['low', 'medium', 'high']).catch('low'),
   anthropicMaxInputChars: z.number().int().positive().catch(4000),
+  geminiApiKey: z.string().catch(''),
+  geminiModel: z.string().min(1).catch(DEFAULT_GEMINI_MODEL),
+  geminiMaxInputChars: z.number().int().positive().catch(4000),
+  /** 「OpenRouter でログイン」で受け取ったキー、または手で貼ったキー */
+  openrouterApiKey: z.string().catch(''),
+  openrouterModel: z.string().min(1).catch(DEFAULT_OPENROUTER_MODEL),
+  openrouterMaxInputChars: z.number().int().positive().catch(4000),
+  ollamaUrl: z.string().url().catch(DEFAULT_OLLAMA_URL),
+  ollamaModel: z.string().min(1).catch(DEFAULT_OLLAMA_MODEL),
+  ollamaMaxInputChars: z.number().int().positive().catch(4000),
   focusOnInvoke: z.boolean().catch(true),
   /** クラウド利用時も解説（2段目）を自動で生成するか。費用が数倍になるので既定はオフ */
   autoExplainCloud: z.boolean().catch(false),

@@ -24,13 +24,23 @@ describe('buildDebugExport', () => {
     );
     const json = buildDebugExport(
       session,
-      { ...DEFAULT_SETTINGS, openaiApiKey: 'sk-secret', anthropicApiKey: 'sk-ant-secret' },
+      {
+        ...DEFAULT_SETTINGS,
+        openaiApiKey: 'sk-secret',
+        anthropicApiKey: 'sk-ant-secret',
+        geminiApiKey: 'gm-secret',
+        openrouterApiKey: 'sk-or-secret',
+      },
       { extensionVersion: '0.1.0', userAgent: 'UA', exportedAt: new Date(0) },
     );
     expect(json).not.toContain('sk-secret');
     expect(json).not.toContain('sk-ant-secret');
+    expect(json).not.toContain('gm-secret');
+    expect(json).not.toContain('sk-or-secret');
     const parsed = JSON.parse(json);
     expect(parsed.settings.openaiApiKeySet).toBe(true);
+    expect(parsed.settings.openrouterApiKeySet).toBe(true);
+    expect(parsed.settings.ollamaModel).toBe('qwen3');
     expect(parsed.session.sourceText).toBe('I has a pen.');
     expect(parsed.session.versions[0]).toMatchObject({ provider: 'builtin', durationMs: 1234 });
   });

@@ -10,17 +10,18 @@ export function buildDebugExport(
   settings: Settings,
   env: { extensionVersion: string; userAgent: string; exportedAt: Date },
 ): string {
-  const { openaiApiKey, anthropicApiKey, ...safeSettings } = settings;
+  // 〜ApiKey の項目はすべて、設定済みかどうか（〜ApiKeySet）だけにする（プロバイダーが増えても漏らさない）
+  const safeSettings = Object.fromEntries(
+    Object.entries(settings).map(([key, value]) =>
+      key.endsWith('ApiKey') ? [`${key}Set`, value !== ''] : [key, value],
+    ),
+  );
   return JSON.stringify(
     {
       kose: env.extensionVersion,
       exportedAt: env.exportedAt.toISOString(),
       userAgent: env.userAgent,
-      settings: {
-        ...safeSettings,
-        openaiApiKeySet: openaiApiKey !== '',
-        anthropicApiKeySet: anthropicApiKey !== '',
-      },
+      settings: safeSettings,
       session,
     },
     null,

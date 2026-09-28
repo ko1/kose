@@ -91,6 +91,10 @@ The kose window is a normal window, so it goes behind Chrome when Chrome is focu
   - Billed to your Anthropic Console API credits — separate from Claude.ai subscriptions. Create a dedicated API key and set a spend limit in the Console.
   - For `claude-opus-5`, server-side fallbacks (`fallbacks: "default"`) are enabled so that a refused request can be continued by another model.
 - **OpenAI API**: selecting it asks for permission to access `api.openai.com`. Settings: API key, model (default `gpt-5-mini`), max input length.
+- **Gemini API (Google)**: API key from Google AI Studio; there is a free tier (on the free tier Google may use the content to improve its products). Default model `gemini-2.5-flash`.
+- **OpenRouter**: Claude, GPT, Gemini and many others with one account. Press “Log in with OpenRouter” to get a key without copying it (OAuth PKCE; the key is saved in the extension). Usage is paid from your OpenRouter credits and the cost of each request is shown. Default model `openai/gpt-5-mini`; any model ID from openrouter.ai/models can be entered.
+- **Ollama**: a local AI on your computer — free, and the text does not leave your computer. Install Ollama, pull a model (default `qwen3`: `ollama pull qwen3`), and set the environment variable `OLLAMA_ORIGINS=chrome-extension://*` before starting Ollama so the extension may connect. Only `localhost` / `127.0.0.1` servers can be used. Explanations are generated automatically, as with Chrome built-in AI.
+- The provider is chosen from a dropdown on the options page; only the chosen provider's settings are shown.
 - API keys are stored in `chrome.storage.local`. **This is not encrypted secure storage** — do not use kose with your keys on a shared PC.
 - If Chrome built-in AI is unavailable, kose never falls back to a cloud provider automatically.
 
@@ -101,9 +105,12 @@ The kose window is a normal window, so it goes behind Chrome when Chrome is focu
 | `contextMenus` | The right-click menu |
 | `activeTab`, `scripting` | Read the selection (with line breaks) only from the tab where you invoked kose; no always-on content scripts |
 | `storage` | Settings and mistake notes (`local`), per-tab reviews (`session`: in memory only, cleared when the browser exits) |
+| `identity` | “Log in with OpenRouter” (opens OpenRouter's login page and receives the key) |
 | `clipboardRead` | Read the clipboard only when you open `launch.html` (running kose from another application) |
 | `https://api.anthropic.com/*` (optional) | Requested only when Claude is selected |
 | `https://api.openai.com/*` (optional) | Requested only when OpenAI is selected |
+| `https://generativelanguage.googleapis.com/*`, `https://openrouter.ai/*` (optional) | Requested only when Gemini / OpenRouter is selected |
+| `http://localhost/*`, `http://127.0.0.1/*` (optional) | Requested only when Ollama is selected |
 
 The Alt+K shortcut is declared with `commands`, which needs no permission.
 

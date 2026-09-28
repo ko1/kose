@@ -28,7 +28,7 @@ kose rewrites the text you select on any web page into good English or good Japa
 
 Privacy
 • Default AI: Chrome's built-in AI — your text never leaves your device.
-• Optional: Claude (Anthropic) or OpenAI with your own API key. Text is sent only to the provider you choose.
+• Optional: Claude (Anthropic), OpenAI, Gemini or OpenRouter (log in, no key copying), or a local Ollama server. Text is sent only to the provider you choose.
 • No developer server, no analytics. Mistake notes keep only short phrases, never the full text or the page URL.
 
 The UI is in Japanese when Chrome is in Japanese, and in English otherwise. Explanations are written in Chrome's UI language.
@@ -49,7 +49,7 @@ kose は、Web ページで選んだ文章を、よい日本語・よい英語�
 
 プライバシー
 • 既定の AI は Chrome 内蔵 AI。文章は端末の外に出ません。
-• 任意で Claude（Anthropic）や OpenAI も使えます（ご自身の API キー）。文章は選んだ事業者にだけ送られます。
+• 任意で Claude（Anthropic）、OpenAI、Gemini、OpenRouter（ログインするだけでキーのコピー不要）、自分のパソコンの Ollama も使えます。文章は選んだ事業者にだけ送られます。
 • 開発者のサーバーはなく、利用状況の計測もしません。間違いメモには短い語句だけを保存し、原文全体やページの URL は保存しません。
 
 Chrome の表示言語が日本語なら日本語、それ以外は英語の画面になります。解説も Chrome の表示言語で書かれます。
@@ -72,7 +72,8 @@ Chrome の表示言語が日本語なら日本語、それ以外は英語の画�
   - `clipboardRead`: `Read the clipboard only when the user opens the extension's launch page (e.g. from a desktop shortcut) to run kose on text copied in another application.`
   - `contextMenus`: `Provide the single right-click menu item “kose: Make it good …” for selected text.`
   - `storage`: `Store settings, the user's mistake notes (short phrases only) and the window position locally, and keep reviews in session storage (in memory) until the tab or browser is closed.`
-  - Host permissions `https://api.anthropic.com/*`, `https://api.openai.com/*` (optional): `Requested only when the user selects Claude or OpenAI as the AI provider, to send the text the user runs kose on to that API with the user's own API key.`
+  - Host permissions `https://api.anthropic.com/*`, `https://api.openai.com/*`, `https://generativelanguage.googleapis.com/*`, `https://openrouter.ai/*`, `http://localhost/*`, `http://127.0.0.1/*` (optional): `Requested only when the user selects that AI provider (Claude, OpenAI, Gemini, OpenRouter, or a local Ollama server), to send the text the user runs kose on to that API.`
+  - `identity`: `Used only for “Log in with OpenRouter” (OAuth PKCE): opens OpenRouter's login page with launchWebAuthFlow and receives the API key it issues.`
 - **Remote code**: No. All code is in the package; the APIs return JSON data only.
 - **Data usage** (what to check)
   - Website content: **yes** — the selected text is transmitted to the AI provider the user chooses (only for cloud providers). Not stored by the developer.

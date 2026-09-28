@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { ANTHROPIC_ORIGIN } from '../ai/anthropicProvider';
 import { BuiltinProvider } from '../ai/builtinProvider';
-import { OPENAI_ORIGIN } from '../ai/openaiProvider';
+import { compatibleSpec } from '../ai/factory';
+import { GEMINI_ORIGIN, OPENAI_ORIGIN, OPENROUTER_ORIGIN } from '../ai/openaiProvider';
+import { loginWithOpenRouter } from '../ai/openrouterAuth';
 import type { ProviderAvailability } from '../ai/provider';
 import { LANGUAGE_CODES, LanguageCode, MistakeCard } from '../domain/types';
 import { launchCommand, windowsSetupScript } from '../shared/launcher';
@@ -10,8 +12,14 @@ import { M } from '../shared/messages';
 import {
   ANTHROPIC_MODELS,
   DEFAULT_ANTHROPIC_MODEL,
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_OLLAMA_MODEL,
+  DEFAULT_OLLAMA_URL,
   DEFAULT_OPENAI_MODEL,
+  DEFAULT_OPENROUTER_MODEL,
   loadSettings,
+  PROVIDERS,
+  ProviderSetting,
   saveSettings,
   Settings,
 } from '../storage/settings';
@@ -24,10 +32,37 @@ import {
   onMistakesChanged,
 } from '../storage/mistakeStore';
 
-/** クラウドプロバイダーごとの接続先（選んだときだけ許可を求め、外したら返す） */
-const CLOUD_ORIGINS: Record<'openai' | 'anthropic', { origin: string; host: string; name: string }> = {
-  openai: { origin: OPENAI_ORIGIN, host: 'api.openai.com', name: 'OpenAI' },
-  anthropic: { origin: ANTHROPIC_ORIGIN, host: 'api.anthropic.com', name: 'Claude' },
+interface AccessTarget {
+  origin: string;
+  host: string;
+  name: string;
+}
+
+/** プロバイダーの接続先（選んだときだけ許可を求め、外したら返す）。Chrome内蔵AIは null */
+function accessTarget(settings: Settings): AccessTarget | null {
+  if (settings.provider === 'builtin') return null;
+  if (settings.provider === 'anthropic') return { origin: ANTHROPIC_ORIGIN, host: 'api.anthropic.com', name: 'Claude' };
+  const spec = compatibleSpec(settings);
+  return { origin: spec.origin, host: spec.host, name: spec.name };
+}
+
+/** 許可を求めうるすべての接続先（manifest の optional_host_permissions と揃える） */
+const ALL_ORIGINS = [
+  ANTHROPIC_ORIGIN,
+  OPENAI_ORIGIN,
+  GEMINI_ORIGIN,
+  OPENROUTER_ORIGIN,
+  'http://localhost/*',
+  'http://127.0.0.1/*',
+];
+
+const PROVIDER_LABELS: Record<ProviderSetting, () => string> = {
+  builtin: () => M.options.builtin,
+  anthropic: () => M.options.claude,
+  openai: () => M.options.openai,
+  gemini: () => M.options.gemini,
+  openrouter: () => M.options.openrouter,
+  ollama: () => M.options.ollama,
 };
 
 export function Options() {
@@ -91,7 +126,7 @@ export function Options() {
 
 /**
  * AIプロバイダーの選択。ドロップダウンで選び、選んだものに必要な設定（APIキーなど）だけを下に出す。
- * クラウドを選んだらそのホストへの接続許可を求め、使わなくなったホストの許可は返す。
+ * 接続先があるものは選んだときに接続の許可を求め、使わなくなった接続先の許可は返す。
  */
 function ProviderSection({
   settings,
@@ -103,35 +138,41 @@ function ProviderSection({
   setMessage: (message: string) => void;
 }) {
   const provider = settings.provider;
-  const cloud = provider === 'builtin' ? null : CLOUD_ORIGINS[provider];
+  const target = accessTarget(settings);
   const [granted, setGranted] = useState<boolean | null>(null);
 
   useEffect(() => {
     setGranted(null);
-    if (cloud) chrome.permissions.contains({ origins: [cloud.origin] }).then(setGranted);
-  }, [cloud]);
+    if (target) chrome.permissions.contains({ origins: [target.origin] }).then(setGranted);
+  }, [target?.origin]);
 
   /** 接続の許可を求める。ユーザー操作の中でしか求められないので、失敗したらボタンから求め直せるようにする */
-  const requestAccess = async (target: typeof cloud) => {
-    if (!target) return;
+  const requestAccess = async (next: AccessTarget | null) => {
+    if (!next) return;
     let ok = false;
     try {
-      ok = await chrome.permissions.request({ origins: [target.origin] });
+      ok = await chrome.permissions.request({ origins: [next.origin] });
     } catch {
       ok = false;
     }
     setGranted(ok);
-    if (!ok) setMessage(M.options.notGranted(target.host, target.name));
+    if (!ok) setMessage(M.options.notGranted(next.host, next.name));
   };
 
-  const choose = async (next: Settings['provider']) => {
-    const target = next === 'builtin' ? null : CLOUD_ORIGINS[next];
+  const choose = async (next: ProviderSetting) => {
+    const nextTarget = accessTarget({ ...settings, provider: next });
     await save({ provider: next });
-    await requestAccess(target);
-    const unused = Object.entries(CLOUD_ORIGINS)
-      .filter(([id]) => id !== next)
-      .map(([, c]) => c.origin);
-    await chrome.permissions.remove({ origins: unused });
+    await requestAccess(nextTarget);
+    await chrome.permissions.remove({ origins: ALL_ORIGINS.filter((o) => o !== nextTarget?.origin) });
+  };
+
+  const loginOpenRouter = async () => {
+    try {
+      const key = await loginWithOpenRouter();
+      await save({ openrouterApiKey: key }, M.options.openrouterLoggedIn);
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : String(e));
+    }
   };
 
   return (
@@ -140,27 +181,35 @@ function ProviderSection({
       <select
         className="provider-select"
         value={provider}
-        onChange={(e) => choose(e.target.value as Settings['provider'])}
+        onChange={(e) => choose(e.target.value as ProviderSetting)}
         aria-label={M.options.provider}
       >
-        <option value="builtin">{M.options.builtin}</option>
-        <option value="anthropic">{M.options.claude}</option>
-        <option value="openai">{M.options.openai}</option>
+        {PROVIDERS.map((id) => (
+          <option key={id} value={id}>
+            {PROVIDER_LABELS[id]()}
+          </option>
+        ))}
       </select>
 
-      {cloud ? (
-        <p className="hint">
-          {M.options.sentTo[0]} <code>{cloud.host}</code>
-          {M.options.sentTo[1]}
-        </p>
-      ) : (
+      {provider === 'builtin' ? (
         <p className="hint">{M.options.builtinNote}</p>
+      ) : provider === 'ollama' ? (
+        <p className="hint">{M.options.ollamaNote}</p>
+      ) : (
+        target && (
+          <p className="hint">
+            {M.options.sentTo[0]} <code>{target.host}</code>
+            {M.options.sentTo[1]}
+          </p>
+        )
       )}
+      {provider === 'gemini' && <p className="hint">{M.options.geminiNote}</p>}
+      {provider === 'openrouter' && <p className="hint">{M.options.openrouterNote}</p>}
 
-      {cloud && granted === false && (
+      {target && granted === false && (
         <p className="hint warn">
-          {M.options.needsAccess(cloud.host)}{' '}
-          <button onClick={() => requestAccess(cloud)}>{M.options.allowAccess(cloud.host)}</button>
+          {M.options.needsAccess(target.host)}{' '}
+          <button onClick={() => requestAccess(target)}>{M.options.allowAccess(target.host)}</button>
         </p>
       )}
 
@@ -204,6 +253,53 @@ function ProviderSection({
           defaultModel={DEFAULT_OPENAI_MODEL}
           values={{ apiKey: settings.openaiApiKey, model: settings.openaiModel, maxChars: settings.openaiMaxInputChars }}
           onSave={(v) => save({ openaiApiKey: v.apiKey, openaiModel: v.model, openaiMaxInputChars: v.maxChars })}
+        />
+      )}
+
+      {provider === 'gemini' && (
+        <CloudSettings
+          keyPlaceholder="AIza..."
+          defaultModel={DEFAULT_GEMINI_MODEL}
+          values={{ apiKey: settings.geminiApiKey, model: settings.geminiModel, maxChars: settings.geminiMaxInputChars }}
+          onSave={(v) => save({ geminiApiKey: v.apiKey, geminiModel: v.model, geminiMaxInputChars: v.maxChars })}
+        />
+      )}
+
+      {provider === 'openrouter' && (
+        <CloudSettings
+          keyPlaceholder="sk-or-..."
+          defaultModel={DEFAULT_OPENROUTER_MODEL}
+          modelHint={M.options.openrouterModelHint}
+          extra={
+            <p>
+              <button className="primary" onClick={loginOpenRouter}>
+                {M.options.openrouterLogin}
+              </button>{' '}
+              <span className="hint">{M.options.openrouterLoginNote}</span>
+            </p>
+          }
+          values={{
+            apiKey: settings.openrouterApiKey,
+            model: settings.openrouterModel,
+            maxChars: settings.openrouterMaxInputChars,
+          }}
+          onSave={(v) =>
+            save({ openrouterApiKey: v.apiKey, openrouterModel: v.model, openrouterMaxInputChars: v.maxChars })
+          }
+        />
+      )}
+
+      {provider === 'ollama' && (
+        <CloudSettings
+          keyLabel={M.options.serverUrl}
+          keyPlaceholder={DEFAULT_OLLAMA_URL}
+          secret={false}
+          defaultModel={DEFAULT_OLLAMA_MODEL}
+          modelHint={M.options.ollamaModelHint}
+          values={{ apiKey: settings.ollamaUrl, model: settings.ollamaModel, maxChars: settings.ollamaMaxInputChars }}
+          onSave={(v) =>
+            save({ ollamaUrl: v.apiKey || DEFAULT_OLLAMA_URL, ollamaModel: v.model, ollamaMaxInputChars: v.maxChars })
+          }
         />
       )}
 
@@ -434,6 +530,10 @@ interface CloudValues {
 
 function CloudSettings({
   keyPlaceholder,
+  keyLabel = M.options.apiKey,
+  secret = true,
+  extra,
+  modelHint,
   defaultModel,
   modelOptions,
   effortOptions,
@@ -441,6 +541,14 @@ function CloudSettings({
   onSave,
 }: {
   keyPlaceholder: string;
+  /** 1行目の欄の名前。Ollama では API キーの代わりにサーバーの URL を入れる */
+  keyLabel?: string;
+  /** API キー（伏せ字で表示し、削除ボタンと保存先の注意を出す）か */
+  secret?: boolean;
+  /** 欄の上に出す追加の操作（OpenRouter のログインなど） */
+  extra?: ReactNode;
+  /** モデル欄の下に出す補足 */
+  modelHint?: string;
   defaultModel: string;
   /** 指定するとモデル欄をドロップダウンにする（一覧にないモデルは「その他」で手入力） */
   modelOptions?: { id: string; label: string }[];
@@ -487,6 +595,7 @@ function CloudSettings({
 
   return (
     <div className="provider-settings">
+      {extra}
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -494,9 +603,9 @@ function CloudSettings({
         }}
       >
         <label className="row">
-          <span>{M.options.apiKey}</span>
+          <span>{keyLabel}</span>
           <input
-            type="password"
+            type={secret ? 'password' : 'text'}
             value={apiKey}
             autoComplete="off"
             onChange={(e) => setApiKey(e.target.value)}
@@ -511,6 +620,7 @@ function CloudSettings({
             <input type="text" value={model} onChange={(e) => setModel(e.target.value)} placeholder={defaultModel} />
           )}
         </label>
+        {modelHint && <p className="hint">{modelHint}</p>}
         {explainModel !== undefined && modelOptions && (
           <label className="row">
             <span>{M.options.explainModel}</span>
@@ -539,20 +649,20 @@ function CloudSettings({
             onChange={(e) => setMaxChars(Number(e.target.value))}
           />
         </label>
-        <p className="hint">
-          {M.options.apiKeyNote}
-        </p>
+        {secret && <p className="hint">{M.options.apiKeyNote}</p>}
         <div className="actions">
           <button type="submit" className="primary" disabled={!dirty}>
             {dirty ? M.options.save : M.options.savedButton}
           </button>
-          <button
-            type="button"
-            disabled={values.apiKey === ''}
-            onClick={() => save({ ...values, apiKey: '' }, M.options.keyDeleted)}
-          >
-            {M.options.deleteKey}
-          </button>
+          {secret && (
+            <button
+              type="button"
+              disabled={values.apiKey === ''}
+              onClick={() => save({ ...values, apiKey: '' }, M.options.keyDeleted)}
+            >
+              {M.options.deleteKey}
+            </button>
+          )}
           {saved && (
             <span className="saved" role="status">
               ✓ {saved}

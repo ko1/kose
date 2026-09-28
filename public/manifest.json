@@ -6,8 +6,15 @@
   "default_locale": "en",
   "minimum_chrome_version": "138",
   "incognito": "not_allowed",
-  "permissions": ["contextMenus", "storage", "activeTab", "scripting", "clipboardRead"],
-  "optional_host_permissions": ["https://api.openai.com/*", "https://api.anthropic.com/*"],
+  "permissions": ["contextMenus", "storage", "activeTab", "scripting", "clipboardRead", "identity"],
+  "optional_host_permissions": [
+    "https://api.anthropic.com/*",
+    "https://api.openai.com/*",
+    "https://generativelanguage.googleapis.com/*",
+    "https://openrouter.ai/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
   "background": {
     "service_worker": "background.js",
     "type": "module"
