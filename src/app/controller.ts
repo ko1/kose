@@ -257,7 +257,7 @@ export class KoseController {
     if (patch.targetLanguage || patch.provider) this.prewarm();
   }
 
-  /** 上部の設定で同じ原文を再生成する */
+  /** 上部の設定で同じ原文を再生成する。改稿の実行中なら、それを取り消してやり直す（run が前の要求を止める） */
   async regenerate(tabId: number): Promise<void> {
     const session = this.sessions.get(tabId);
     if (!session) return;

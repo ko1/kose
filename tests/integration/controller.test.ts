@@ -445,6 +445,23 @@ describe('KoseController', () => {
     expect(snap().sessions).toEqual([]);
   });
 
+  it('改稿の実行中に作り直すと、実行中の要求を取り消して新しい設定でやり直す', async () => {
+    const { provider, controller, snap } = await setup();
+    await putPending(pending(1, 'こんにちは', 'en'));
+    await flush();
+    await controller.updateSettings({ targetLanguage: 'ja' });
+    void controller.regenerate(1);
+    await flush();
+    expect(provider.calls[0].signal?.aborted).toBe(true);
+    expect(provider.calls[1].request).toMatchObject({ sourceText: 'こんにちは', targetLanguage: 'ja' });
+
+    provider.answer(1, 'こんにちは。');
+    await flush();
+    const versions = snap().displayed!.versions;
+    // 取り消した改稿は案にならないので、やり直した案が最初の案になる
+    expect(versions.map((v) => [v.origin, v.targetLanguage])).toEqual([['initial', 'ja']]);
+  });
+
   it('ドロップダウンの変更だけではAPIを呼ばず、再生成で新しいバージョンを追加する', async () => {
     const { provider, controller, snap } = await setup();
     await putPending(pending(1, '原文', 'en'));
