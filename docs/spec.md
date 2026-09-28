@@ -99,10 +99,10 @@ The header shows the **source tab** (page title) of the displayed session and a 
 
 Rarely changed settings live on the options page.
 
-- AI provider (Chrome built-in / Claude / OpenAI) and, for the built-in AI, its availability and the reason if unavailable
+- AI provider, chosen from a dropdown (Chrome built-in / Claude / OpenAI). Only the selected provider's settings are shown below it: for the built-in AI, its availability and the reason if unavailable; for Claude / OpenAI, where the text is sent and the API settings below
 - Claude: API key, rewrite model, explanation/chat model (dropdowns: Haiku 4.5 / Sonnet 5 / Opus 5, or a custom model ID), effort, max input length
 - OpenAI: API key, model, max input length
-- Selecting a cloud provider requests its host permission with `chrome.permissions.request`; switching away removes it
+- Selecting a cloud provider saves it and requests its host permission with `chrome.permissions.request`; switching away removes it. If the permission is not granted (denied, or the request was not treated as a user gesture), a warning with an “Allow access to <host>” button is shown until it is.
 - Save buttons are enabled only when there are unsaved changes, and show inline feedback after saving
 - Whether to generate explanations automatically with cloud providers (default: off)
 - Whether to bring the kose window to the front when kose is invoked (default: on)

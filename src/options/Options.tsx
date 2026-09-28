@@ -45,111 +45,11 @@ export function Options() {
     setMessage(note);
   };
 
-  const chooseProvider = async (provider: Settings['provider']) => {
-    if (provider !== 'builtin') {
-      const { origin, host, name } = CLOUD_ORIGINS[provider];
-      // クリック（ユーザー操作）の中で許可を求める
-      if (!(await chrome.permissions.request({ origins: [origin] }))) {
-        setMessage(M.options.notGranted(host, name));
-        return;
-      }
-    }
-    const unused = Object.entries(CLOUD_ORIGINS)
-      .filter(([id]) => id !== provider)
-      .map(([, c]) => c.origin);
-    await chrome.permissions.remove({ origins: unused });
-    await save({ provider });
-  };
-
   return (
     <main className="options">
       <h1>{M.options.title}</h1>
 
-      <section>
-        <h2>{M.options.provider}</h2>
-        <label className="radio">
-          <input
-            type="radio"
-            name="provider"
-            checked={settings.provider === 'builtin'}
-            onChange={() => chooseProvider('builtin')}
-          />
-          <span>
-            <strong>{M.options.builtin}</strong>
-            <br />
-            {M.options.builtinNote}
-          </span>
-        </label>
-        <BuiltinStatus />
-        <label className="radio">
-          <input
-            type="radio"
-            name="provider"
-            checked={settings.provider === 'anthropic'}
-            onChange={() => chooseProvider('anthropic')}
-          />
-          <span>
-            <strong>{M.options.claude}</strong>
-            <br />
-            {M.options.sentTo[0]} <code>api.anthropic.com</code>
-            {M.options.sentTo[1]}
-          </span>
-        </label>
-        <label className="radio">
-          <input
-            type="radio"
-            name="provider"
-            checked={settings.provider === 'openai'}
-            onChange={() => chooseProvider('openai')}
-          />
-          <span>
-            <strong>{M.options.openai}</strong>
-            <br />
-            {M.options.sentTo[0]} <code>api.openai.com</code>
-            {M.options.sentTo[1]}
-          </span>
-        </label>
-        <p className="hint">{M.options.noFallback}</p>
-      </section>
-
-      <CloudSection
-        title={M.options.claude}
-        keyPlaceholder="sk-ant-..."
-        defaultModel={DEFAULT_ANTHROPIC_MODEL}
-        modelOptions={ANTHROPIC_MODELS.map((m) => ({
-          id: m.id,
-          label: `${m.name} — ${M.options.modelTiers[m.tier]} (${m.price})`,
-        }))}
-        effortOptions={[
-          { id: 'low', label: M.options.effortLow },
-          { id: 'medium', label: 'medium' },
-          { id: 'high', label: M.options.effortHigh },
-        ]}
-        values={{
-          apiKey: settings.anthropicApiKey,
-          model: settings.anthropicModel,
-          maxChars: settings.anthropicMaxInputChars,
-          effort: settings.anthropicEffort,
-          explainModel: settings.anthropicExplainModel,
-        }}
-        onSave={(v) =>
-          save({
-            anthropicApiKey: v.apiKey,
-            anthropicModel: v.model,
-            anthropicMaxInputChars: v.maxChars,
-            anthropicEffort: v.effort as Settings['anthropicEffort'],
-            anthropicExplainModel: v.explainModel,
-          })
-        }
-      />
-
-      <CloudSection
-        title={M.options.openai}
-        keyPlaceholder="sk-..."
-        defaultModel={DEFAULT_OPENAI_MODEL}
-        values={{ apiKey: settings.openaiApiKey, model: settings.openaiModel, maxChars: settings.openaiMaxInputChars }}
-        onSave={(v) => save({ openaiApiKey: v.apiKey, openaiModel: v.model, openaiMaxInputChars: v.maxChars })}
-      />
+      <ProviderSection settings={settings} save={save} setMessage={setMessage} />
 
       <section>
         <h2>{M.options.explanation}</h2>
@@ -186,6 +86,129 @@ export function Options() {
         {message}
       </p>
     </main>
+  );
+}
+
+/**
+ * AIプロバイダーの選択。ドロップダウンで選び、選んだものに必要な設定（APIキーなど）だけを下に出す。
+ * クラウドを選んだらそのホストへの接続許可を求め、使わなくなったホストの許可は返す。
+ */
+function ProviderSection({
+  settings,
+  save,
+  setMessage,
+}: {
+  settings: Settings;
+  save: (patch: Partial<Settings>, note?: string) => Promise<void>;
+  setMessage: (message: string) => void;
+}) {
+  const provider = settings.provider;
+  const cloud = provider === 'builtin' ? null : CLOUD_ORIGINS[provider];
+  const [granted, setGranted] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    setGranted(null);
+    if (cloud) chrome.permissions.contains({ origins: [cloud.origin] }).then(setGranted);
+  }, [cloud]);
+
+  /** 接続の許可を求める。ユーザー操作の中でしか求められないので、失敗したらボタンから求め直せるようにする */
+  const requestAccess = async (target: typeof cloud) => {
+    if (!target) return;
+    let ok = false;
+    try {
+      ok = await chrome.permissions.request({ origins: [target.origin] });
+    } catch {
+      ok = false;
+    }
+    setGranted(ok);
+    if (!ok) setMessage(M.options.notGranted(target.host, target.name));
+  };
+
+  const choose = async (next: Settings['provider']) => {
+    const target = next === 'builtin' ? null : CLOUD_ORIGINS[next];
+    await save({ provider: next });
+    await requestAccess(target);
+    const unused = Object.entries(CLOUD_ORIGINS)
+      .filter(([id]) => id !== next)
+      .map(([, c]) => c.origin);
+    await chrome.permissions.remove({ origins: unused });
+  };
+
+  return (
+    <section>
+      <h2>{M.options.provider}</h2>
+      <select
+        className="provider-select"
+        value={provider}
+        onChange={(e) => choose(e.target.value as Settings['provider'])}
+        aria-label={M.options.provider}
+      >
+        <option value="builtin">{M.options.builtin}</option>
+        <option value="anthropic">{M.options.claude}</option>
+        <option value="openai">{M.options.openai}</option>
+      </select>
+
+      {cloud ? (
+        <p className="hint">
+          {M.options.sentTo[0]} <code>{cloud.host}</code>
+          {M.options.sentTo[1]}
+        </p>
+      ) : (
+        <p className="hint">{M.options.builtinNote}</p>
+      )}
+
+      {cloud && granted === false && (
+        <p className="hint warn">
+          {M.options.needsAccess(cloud.host)}{' '}
+          <button onClick={() => requestAccess(cloud)}>{M.options.allowAccess(cloud.host)}</button>
+        </p>
+      )}
+
+      {provider === 'builtin' && <BuiltinStatus />}
+
+      {provider === 'anthropic' && (
+        <CloudSettings
+          keyPlaceholder="sk-ant-..."
+          defaultModel={DEFAULT_ANTHROPIC_MODEL}
+          modelOptions={ANTHROPIC_MODELS.map((m) => ({
+            id: m.id,
+            label: `${m.name} — ${M.options.modelTiers[m.tier]} (${m.price})`,
+          }))}
+          effortOptions={[
+            { id: 'low', label: M.options.effortLow },
+            { id: 'medium', label: 'medium' },
+            { id: 'high', label: M.options.effortHigh },
+          ]}
+          values={{
+            apiKey: settings.anthropicApiKey,
+            model: settings.anthropicModel,
+            maxChars: settings.anthropicMaxInputChars,
+            effort: settings.anthropicEffort,
+            explainModel: settings.anthropicExplainModel,
+          }}
+          onSave={(v) =>
+            save({
+              anthropicApiKey: v.apiKey,
+              anthropicModel: v.model,
+              anthropicMaxInputChars: v.maxChars,
+              anthropicEffort: v.effort as Settings['anthropicEffort'],
+              anthropicExplainModel: v.explainModel,
+            })
+          }
+        />
+      )}
+
+      {provider === 'openai' && (
+        <CloudSettings
+          keyPlaceholder="sk-..."
+          defaultModel={DEFAULT_OPENAI_MODEL}
+          values={{ apiKey: settings.openaiApiKey, model: settings.openaiModel, maxChars: settings.openaiMaxInputChars }}
+          onSave={(v) => save({ openaiApiKey: v.apiKey, openaiModel: v.model, openaiMaxInputChars: v.maxChars })}
+        />
+      )}
+
+      <p className="hint">{M.options.noFallback}</p>
+    </section>
   );
 }
 
@@ -409,8 +432,7 @@ interface CloudValues {
   explainModel?: string;
 }
 
-function CloudSection({
-  title,
+function CloudSettings({
   keyPlaceholder,
   defaultModel,
   modelOptions,
@@ -418,7 +440,6 @@ function CloudSection({
   values,
   onSave,
 }: {
-  title: string;
   keyPlaceholder: string;
   defaultModel: string;
   /** 指定するとモデル欄をドロップダウンにする（一覧にないモデルは「その他」で手入力） */
@@ -465,8 +486,7 @@ function CloudSection({
   };
 
   return (
-    <section>
-      <h2>{title}</h2>
+    <div className="provider-settings">
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -541,7 +561,7 @@ function CloudSection({
           {dirty && !saved && <span className="unsaved">{M.options.unsaved}</span>}
         </div>
       </form>
-    </section>
+    </div>
   );
 }
 

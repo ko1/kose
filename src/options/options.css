@@ -14,7 +14,6 @@
   border-bottom: 1px solid var(--border);
 }
 
-.radio,
 .checkbox {
   display: flex;
   gap: 8px;
@@ -22,8 +21,16 @@
   margin: 8px 0;
 }
 
-.radio input {
-  margin-top: 4px;
+
+.provider-select {
+  min-width: 16em;
+  margin: 4px 0;
+}
+
+.provider-settings {
+  margin: 8px 0 0;
+  padding: 4px 12px;
+  border-left: 3px solid var(--border);
 }
 
 .row {
@@ -41,7 +48,8 @@
 }
 
 .builtin-status {
-  margin: 0 0 8px 24px;
+  margin: 8px 0;
+  padding-left: 18px;
 }
 
 .message {
