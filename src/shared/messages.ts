@@ -252,6 +252,9 @@ const en = {
     intro: 'Copy text in any application, then run this command: the kose window opens and runs on the copied text.',
     copy: 'Copy',
     copied: 'Copied',
+    winSetup:
+      'Windows: run this once in Windows PowerShell (powershell.exe, not pwsh). It builds a small kose.exe in %LOCALAPPDATA%\\Microsoft\\WindowsApps, which is on your PATH. Then copy text and press Win+R → kose → Enter. No registry changes and nothing stays running; delete kose.exe to undo.',
+    winShortcut: 'Or make a shortcut with this command:',
     win: 'Windows: right-click the desktop → New → Shortcut, paste this command, and set “Shortcut key” in its Properties (e.g. Ctrl+Alt+K). The path is Chrome’s standard location; if Chrome was installed for your user only, use %LOCALAPPDATA%\\Google\\Chrome\\Application\\chrome.exe. A path-independent alternative is cmd /c start "" chrome "<URL>" (a console window flashes briefly).',
     mac: 'Mac: run this command from the Shortcuts app (“Run Shell Script”) and assign a keyboard shortcut to it.',
     other: 'Assign this command to a keyboard shortcut in your desktop environment.',
@@ -502,6 +505,9 @@ const ja: Messages = {
     intro: 'どのアプリでも文章をコピーしてからこのコマンドを実行すると、koseウィンドウが開いて、その文章で実行します。',
     copy: 'コピー',
     copied: 'コピーしました',
+    winSetup:
+      'Windows：Windows PowerShell（pwsh ではなく powershell.exe）でこのスクリプトを1回実行すると、PATH の通った %LOCALAPPDATA%\\Microsoft\\WindowsApps に小さな kose.exe を作ります。あとは文章をコピーして Win+R → kose → Enter です。レジストリには触らず、常駐もしません。元に戻すには kose.exe を削除します。',
+    winShortcut: 'または、このコマンドでショートカットを作ります:',
     win: 'Windows：デスクトップを右クリック →「新規作成」→「ショートカット」でこのコマンドを貼り付け、プロパティの「ショートカット キー」を設定します（例：Ctrl+Alt+K）。パスは Chrome の標準のインストール先です。ユーザー単位でインストールした場合は %LOCALAPPDATA%\\Google\\Chrome\\Application\\chrome.exe にしてください。パスに依存しない書き方として cmd /c start "" chrome "<URL>" もあります（黒い画面が一瞬出ます）。',
     mac: 'Mac：ショートカット.app の「シェルスクリプトを実行」でこのコマンドを実行し、キーボードショートカットを割り当てます。',
     other: 'デスクトップ環境のキーボードショートカットに、このコマンドを割り当てます。',

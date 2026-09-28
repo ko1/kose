@@ -151,9 +151,13 @@ button.link {
   gap: 8px;
 }
 
-.command code {
+.command pre {
   flex: 1;
+  min-width: 0;
+  margin: 0;
   padding: 6px 8px;
+  overflow-x: auto;
+  white-space: pre-wrap;
   overflow-wrap: anywhere;
   background: var(--bg-subtle);
   border-radius: var(--radius);

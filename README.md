@@ -65,19 +65,19 @@ KOSE_WIN_DIR=/mnt/c/Users/<you>/kose-dist npm run build:win   # custom destinati
 
 ### Run from any application (Windows)
 
-kose can also take text from the clipboard, so you can use it outside Chrome (Notepad, Word, Slack, …) while Chrome is running or not.
+kose can also take text from the clipboard, so you can use it outside Chrome (Notepad, Word, Slack, …), whether Chrome is running or not. Opening `chrome-extension://<ID>/launch.html` reads the clipboard, opens the kose window (or brings it to the front) and runs kose on the text as free input; a tab opens for a moment and closes. With an empty clipboard it just opens the free input.
 
-1. Copy the command from “Run from other applications” on the options page (it contains kose's ID and matches your OS). Or build it yourself with the ID from `chrome://extensions`.
-2. Create a shortcut (right-click the desktop → New → Shortcut) with this target:
-   ```
-   "C:\Program Files\Google\Chrome\Application\chrome.exe" "chrome-extension://<ID>/launch.html"
-   ```
-3. Optional: in the shortcut's Properties, set “Shortcut key” (Windows allows only Ctrl+Alt+<key>, e.g. Ctrl+Alt+K). Shortcut keys work for shortcuts on the desktop or in the Start menu.
-4. Select text in any application, press Ctrl+C, then the shortcut key. A tab opens for a moment and closes; the kose window opens (or comes to the front) and runs kose on the copied text as free input. With an empty clipboard it just opens the free input.
+**Win+R → `kose` (recommended).** On the options page, “Run from other applications” shows a setup script with kose's ID. Run it once in Windows PowerShell (`powershell.exe`, not `pwsh`). It compiles a tiny `kose.exe` that only starts Chrome with the launch URL, into `%LOCALAPPDATA%\Microsoft\WindowsApps` (already on the user PATH). Then: select text → Ctrl+C → Win+R → `kose` → Enter. No registry changes, nothing stays running, no console window; delete `kose.exe` to undo.
 
-The command uses Chrome's standard location. If Chrome was installed for your user only, use `%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe`; `cmd /c start "" chrome "chrome-extension://<ID>/launch.html"` works regardless of the location (a console window flashes briefly). The extension cannot find out where chrome.exe is.
+**Shortcut key.** Alternatively, create a shortcut (right-click the desktop → New → Shortcut) with the command shown on the options page, e.g.
 
-This needs no resident process. The unpacked extension's ID stays the same as long as you load it from the same folder.
+```
+"C:\Program Files\Google\Chrome\Application\chrome.exe" "chrome-extension://<ID>/launch.html"
+```
+
+and set “Shortcut key” in its Properties (Windows allows only Ctrl+Alt+<key>, e.g. Ctrl+Alt+K; it works for shortcuts on the desktop or in the Start menu).
+
+Both use Chrome's standard location. If Chrome was installed for your user only, it is `%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe` (the setup script checks both); `cmd /c start "" chrome "<URL>"` works regardless of the location but flashes a console window. The unpacked extension's ID stays the same as long as you load it from the same folder.
 
 The kose window is a normal window, so it goes behind Chrome when Chrome is focused. Chrome extensions cannot make a window always-on-top; use an OS tool such as PowerToys "Always on Top" if you want that.
 

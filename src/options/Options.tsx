@@ -4,7 +4,7 @@ import { BuiltinProvider } from '../ai/builtinProvider';
 import { OPENAI_ORIGIN } from '../ai/openaiProvider';
 import type { ProviderAvailability } from '../ai/provider';
 import { LANGUAGE_CODES, LanguageCode, MistakeCard } from '../domain/types';
-import { launchCommand } from '../shared/launcher';
+import { launchCommand, windowsSetupScript } from '../shared/launcher';
 import { M } from '../shared/messages';
 import {
   ANTHROPIC_MODELS,
@@ -188,31 +188,52 @@ export function Options() {
   );
 }
 
-/** ほかのアプリから起動するコマンド（この拡張の ID 入り）を表示してコピーできるようにする */
+/** ほかのアプリから起動するためのコマンド（この拡張の ID 入り）を表示してコピーできるようにする */
 function LauncherSection() {
   const [os, setOs] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   useEffect(() => {
     chrome.runtime.getPlatformInfo().then((info) => setOs(info.os));
   }, []);
   if (os === null) return null;
 
-  const command = launchCommand(os, chrome.runtime.getURL('launch.html'));
-  const copy = async () => {
-    await navigator.clipboard.writeText(command);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
+  const url = chrome.runtime.getURL('launch.html');
+  const command = launchCommand(os, url);
   return (
     <section>
       <h2>{M.launcher.heading}</h2>
       <p className="hint">{M.launcher.intro}</p>
-      <div className="command">
-        <code>{command}</code>
-        <button onClick={copy}>{copied ? M.launcher.copied : M.launcher.copy}</button>
-      </div>
-      <p className="hint">{os === 'win' ? M.launcher.win : os === 'mac' ? M.launcher.mac : M.launcher.other}</p>
+      {os === 'win' ? (
+        <>
+          <p className="hint">{M.launcher.winSetup}</p>
+          <CopyBlock text={windowsSetupScript(url)} />
+          <p className="hint">{M.launcher.winShortcut}</p>
+          <CopyBlock text={command} />
+          <p className="hint">{M.launcher.win}</p>
+        </>
+      ) : (
+        <>
+          <CopyBlock text={command} />
+          <p className="hint">{os === 'mac' ? M.launcher.mac : M.launcher.other}</p>
+        </>
+      )}
     </section>
+  );
+}
+
+function CopyBlock({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+  return (
+    <div className="command">
+      <pre>
+        <code>{text}</code>
+      </pre>
+      <button onClick={copy}>{copied ? M.launcher.copied : M.launcher.copy}</button>
+    </div>
   );
 }
 
