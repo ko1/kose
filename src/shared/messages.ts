@@ -222,6 +222,9 @@ const en = {
     importFailed: (message: string) => `Could not import: ${message}`,
     deletedAll: 'Deleted all',
     noMistakes: 'Nothing recorded yet.',
+    prevPage: '← Previous',
+    nextPage: 'Next →',
+    pageOf: (page: number, pages: number) => `${page} / ${pages}`,
     mistakeMeta: (language: string, count: number, lastSeen: string, next: string) =>
       `${language} · ${count}× · last ${lastSeen} · next review ${next}`,
     now: 'now',
@@ -474,6 +477,9 @@ const ja: Messages = {
     importFailed: (message: string) => `読み込めませんでした: ${message}`,
     deletedAll: 'すべて削除しました',
     noMistakes: 'まだ記録はありません。',
+    prevPage: '← 前へ',
+    nextPage: '次へ →',
+    pageOf: (page: number, pages: number) => `${page} / ${pages}`,
     mistakeMeta: (language: string, count: number, lastSeen: string, next: string) =>
       `${language}・${count}回・最終 ${lastSeen}・次の復習 ${next}`,
     now: '今すぐ',

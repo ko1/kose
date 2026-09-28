@@ -75,9 +75,22 @@ code {
   font-size: 13px;
 }
 
-.options h3.mistakes-head {
+.mistakes-list {
+  margin-top: 12px;
+}
+
+.mistakes-list summary {
+  cursor: pointer;
+  font-weight: bold;
   font-size: 13px;
-  margin: 16px 0 8px;
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 8px;
 }
 
 .file-button {

@@ -5,6 +5,7 @@ import { OPENAI_ORIGIN } from '../ai/openaiProvider';
 import type { ProviderAvailability } from '../ai/provider';
 import { LANGUAGE_CODES, LanguageCode, MistakeCard } from '../domain/types';
 import { launchCommand, windowsSetupScript } from '../shared/launcher';
+import { paginate } from '../shared/paginate';
 import { M } from '../shared/messages';
 import {
   ANTHROPIC_MODELS,
@@ -312,7 +313,6 @@ function MistakesSection({
         {M.options.quizWhileWaiting}
       </label>
 
-      <h3 className="mistakes-head">{M.options.savedMistakes(cards?.length ?? 0)}</h3>
       <div className="actions">
         <button onClick={exportFile} disabled={!cards?.length}>
           {M.options.exportJson}
@@ -340,31 +340,59 @@ function MistakesSection({
       {cards && cards.length === 0 ? (
         <p className="hint">{M.options.noMistakes}</p>
       ) : (
-        <ul className="mistakes">
-          {sorted.map((c) => (
-            <li key={c.id}>
-              <div className="mistake-pair">
-                <del>{c.before}</del> → <ins>{c.after}</ins>
-              </div>
-              {c.explanation && <p className="hint">{c.explanation}</p>}
-              <div className="mistake-meta">
-                <span>
-                  {M.options.mistakeMeta(
-                    M.languages[c.language].name,
-                    c.count,
-                    formatDate(c.lastSeenAt),
-                    c.review.dueAt <= Date.now() ? M.options.now : formatDate(c.review.dueAt),
-                  )}
-                </span>
-                <button className="link" onClick={() => deleteMistake(c.id)}>
-                  {M.options.delete}
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
+        // 長くなるので既定では閉じ、開いたらページ送りで見せる
+        <details className="mistakes-list">
+          <summary>{M.options.savedMistakes(cards?.length ?? 0)}</summary>
+          <MistakeList cards={sorted} />
+        </details>
       )}
     </section>
+  );
+}
+
+const MISTAKES_PER_PAGE = 20;
+
+function MistakeList({ cards }: { cards: MistakeCard[] }) {
+  const [page, setPage] = useState(0);
+  const view = paginate(cards, page, MISTAKES_PER_PAGE);
+  const nav = view.pages > 1 && (
+    <div className="pager">
+      <button disabled={view.page === 0} onClick={() => setPage(view.page - 1)}>
+        {M.options.prevPage}
+      </button>
+      <span className="hint">{M.options.pageOf(view.page + 1, view.pages)}</span>
+      <button disabled={view.page >= view.pages - 1} onClick={() => setPage(view.page + 1)}>
+        {M.options.nextPage}
+      </button>
+    </div>
+  );
+  return (
+    <>
+      <ul className="mistakes">
+        {view.items.map((c) => (
+          <li key={c.id}>
+            <div className="mistake-pair">
+              <del>{c.before}</del> → <ins>{c.after}</ins>
+            </div>
+            {c.explanation && <p className="hint">{c.explanation}</p>}
+            <div className="mistake-meta">
+              <span>
+                {M.options.mistakeMeta(
+                  M.languages[c.language].name,
+                  c.count,
+                  formatDate(c.lastSeenAt),
+                  c.review.dueAt <= Date.now() ? M.options.now : formatDate(c.review.dueAt),
+                )}
+              </span>
+              <button className="link" onClick={() => deleteMistake(c.id)}>
+                {M.options.delete}
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+      {nav}
+    </>
   );
 }
 
