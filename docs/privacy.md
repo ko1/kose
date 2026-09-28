@@ -38,6 +38,7 @@ kose is a Chrome extension that rewrites text you select into good Japanese or g
 ## Permissions
 
 - `activeTab`, `scripting`: read the selected text (with line breaks) from the tab where you run kose, only at that moment. No content scripts run on pages otherwise.
+- `clipboardRead`: read the clipboard only when you open kose's launch page (`launch.html`, e.g. from a Windows shortcut) to run kose on text copied in another application. The text is handled like free input.
 - `contextMenus`: the right-click menu item.
 - `storage`: the data described above.
 - `https://api.anthropic.com/*`, `https://api.openai.com/*` (optional): requested only when you select that provider, and removed when you switch away.
@@ -88,6 +89,7 @@ kose は、選択した文章をよい日本語・よい英語に改善する Ch
 ## 権限
 
 - `activeTab`、`scripting`：kose を実行したタブから、そのときだけ選択中の文章を（改行を保ったまま）読み取ります。それ以外のときにページでスクリプトを動かすことはありません。
+- `clipboardRead`：kose の起動用ページ（`launch.html`。Windows のショートカットなどから開く）を開いたときだけ、ほかのアプリでコピーした文章を読み取ります。読み取った文章は自由入力と同じように扱います。
 - `contextMenus`：右クリックメニューの項目です。
 - `storage`：上に書いたデータの保存です。
 - `https://api.anthropic.com/*`、`https://api.openai.com/*`（任意）：その AI を選んだときだけ許可を求め、選択をやめると許可を返します。

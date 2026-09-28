@@ -63,6 +63,20 @@ KOSE_WIN_DIR=/mnt/c/Users/<you>/kose-dist npm run build:win   # custom destinati
 6. While the rewrite is being generated, a due mistake may appear under “Review while you wait”. Answer it or ignore it; it folds up when the result arrives. “Review N” in the header reviews all due mistakes.
 7. With no selection (or on pages kose cannot read), the toolbar button and Alt+K open “✏️ Free input” with the cursor in the text area. Type, then Ctrl+Enter (or “kose”). The result appears below; the draft stays until the browser exits. “✏️ Free input” is always the first item in the header's list. Settings: “⚙ Settings” at the bottom (including “Mistake notes and review”).
 
+### Run from any application (Windows)
+
+kose can also take text from the clipboard, so you can use it outside Chrome (Notepad, Word, Slack, …) while Chrome is running or not.
+
+1. Find kose's ID on `chrome://extensions` (32 letters, e.g. `kfbihapbfmlondalpafjmilhdinomhoe`).
+2. Create a shortcut (right-click the desktop → New → Shortcut) with this target:
+   ```
+   "C:\Program Files\Google\Chrome\Application\chrome.exe" "chrome-extension://<ID>/launch.html"
+   ```
+3. Optional: in the shortcut's Properties, set “Shortcut key” (Windows allows only Ctrl+Alt+<key>, e.g. Ctrl+Alt+K). Shortcut keys work for shortcuts on the desktop or in the Start menu.
+4. Select text in any application, press Ctrl+C, then the shortcut key. A tab opens for a moment and closes; the kose window opens (or comes to the front) and runs kose on the copied text as free input. With an empty clipboard it just opens the free input.
+
+This needs no resident process. The unpacked extension's ID stays the same as long as you load it from the same folder.
+
 The kose window is a normal window, so it goes behind Chrome when Chrome is focused. Chrome extensions cannot make a window always-on-top; use an OS tool such as PowerToys "Always on Top" if you want that.
 
 ### AI providers
@@ -85,6 +99,7 @@ The kose window is a normal window, so it goes behind Chrome when Chrome is focu
 | `contextMenus` | The right-click menu |
 | `activeTab`, `scripting` | Read the selection (with line breaks) only from the tab where you invoked kose; no always-on content scripts |
 | `storage` | Settings and mistake notes (`local`), per-tab reviews (`session`: in memory only, cleared when the browser exits) |
+| `clipboardRead` | Read the clipboard only when you open `launch.html` (running kose from another application) |
 | `https://api.anthropic.com/*` (optional) | Requested only when Claude is selected |
 | `https://api.openai.com/*` (optional) | Requested only when OpenAI is selected |
 

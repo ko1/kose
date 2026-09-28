@@ -6,7 +6,7 @@
   "default_locale": "en",
   "minimum_chrome_version": "138",
   "incognito": "not_allowed",
-  "permissions": ["contextMenus", "storage", "activeTab", "scripting"],
+  "permissions": ["contextMenus", "storage", "activeTab", "scripting", "clipboardRead"],
   "optional_host_permissions": ["https://api.openai.com/*", "https://api.anthropic.com/*"],
   "background": {
     "service_worker": "background.js",

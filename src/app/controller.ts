@@ -129,13 +129,13 @@ export class KoseController {
     else this.displayedTabId = this.newestSession()?.source.tabId ?? SCRATCH_TAB_ID;
     this.initialized = true;
     // 初期化中に届いた合図も含めてここで取り出す
-    const scratchAt = await takeScratchRequest();
+    const scratch = await takeScratchRequest();
     this.emit();
 
     // AIの完了は待たない（初期化を塞がない）
     for (const req of pending.sort((a, b) => a.createdAt - b.createdAt)) void this.acceptPending(req);
     // 選択なしで実行されてウィンドウが開いた場合は自由入力を出す（ページからの実行より新しければ）
-    if (scratchAt !== undefined && pending.every((req) => req.createdAt <= scratchAt)) this.showScratch();
+    if (scratch && pending.every((req) => req.createdAt <= scratch.at)) this.openScratch(scratch.text);
     this.prewarm();
   }
 
@@ -230,6 +230,14 @@ export class KoseController {
     this.displayedTabId = SCRATCH_TAB_ID;
     this.scratchFocusSeq++;
     this.emit();
+  }
+
+  /** 自由入力を開く合図を処理する。文章が渡されていれば下書きをそれに置き換えて実行する */
+  private openScratch(text: string | undefined): void {
+    if (text === undefined || text.trim() === '') return this.showScratch();
+    this.setScratchDraft(text);
+    this.showScratch();
+    void this.runScratch();
   }
 
   setScratchDraft(draft: string): void {
@@ -576,7 +584,7 @@ export class KoseController {
         if (isPendingKey(key) && change.newValue) void this.acceptPending(change.newValue as PendingRequest);
         // 初期化中の合図は init の最後にまとめて処理する
         if (key === SCRATCH_REQUEST_KEY && change.newValue !== undefined && this.initialized) {
-          void takeScratchRequest().then((at) => at !== undefined && this.showScratch());
+          void takeScratchRequest().then((request) => request && this.openScratch(request.text));
         }
       }
     };

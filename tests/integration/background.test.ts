@@ -141,7 +141,7 @@ describe('handleInvoke（ツールバーボタン・ショートカット）', (
     const c = fakeChrome();
     expect(await handleInvoke(tab(4))).toBeNull();
     expect(Object.keys(c.storage.session.data).sort()).toEqual(['koseWindowId', 'scratchRequest']);
-    expect(typeof c.storage.session.data.scratchRequest).toBe('number');
+    expect(c.storage.session.data.scratchRequest).toEqual({ at: expect.any(Number) });
     expect([...c.windows.all.values()][0].focused).toBe(true);
   });
 });

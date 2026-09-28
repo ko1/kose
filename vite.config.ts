@@ -16,6 +16,7 @@ export default defineConfig({
       input: {
         kose: resolve(import.meta.dirname, 'kose.html'),
         options: resolve(import.meta.dirname, 'options.html'),
+        launch: resolve(import.meta.dirname, 'launch.html'),
         background: resolve(import.meta.dirname, 'src/background/index.ts'),
       },
       output: {

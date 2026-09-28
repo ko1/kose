@@ -69,6 +69,7 @@ Chrome の表示言語が日本語なら日本語、それ以外は英語の画�
 - **Permission justifications**
   - `activeTab`: `Read the text the user selected, only in the tab where the user runs kose (right-click menu, toolbar button or shortcut).`
   - `scripting`: `Inject a one-time function into that tab to read the selection with its line breaks (and from text areas). No content scripts run otherwise.`
+  - `clipboardRead`: `Read the clipboard only when the user opens the extension's launch page (e.g. from a desktop shortcut) to run kose on text copied in another application.`
   - `contextMenus`: `Provide the single right-click menu item “kose: Make it good …” for selected text.`
   - `storage`: `Store settings, the user's mistake notes (short phrases only) and the window position locally, and keep reviews in session storage (in memory) until the tab or browser is closed.`
   - Host permissions `https://api.anthropic.com/*`, `https://api.openai.com/*` (optional): `Requested only when the user selects Claude or OpenAI as the AI provider, to send the text the user runs kose on to that API with the user's own API key.`

@@ -823,6 +823,29 @@ describe('KoseController', () => {
       expect(second.snap().displayedTabId).toBe(2);
     });
 
+    it('文章付きの合図（外部からの起動）では下書きをその文章にして、すぐに実行する', async () => {
+      const { controller, provider, snap } = await setup();
+      controller.setScratchDraft('old draft');
+      await putPending(pending(1));
+      await flush();
+
+      await requestScratch(Date.now(), 'Hello wrld.');
+      await flush();
+      await flush();
+      expect(snap().displayedTabId).toBe(SCRATCH_TAB_ID);
+      expect(snap().scratch.draft).toBe('Hello wrld.');
+      expect(provider.calls.at(-1)!.request).toMatchObject({ sourceText: 'Hello wrld.' });
+      expect(snap().displayed?.source.tabId).toBe(SCRATCH_TAB_ID);
+    });
+
+    it('ウィンドウが開く前の文章付きの合図も、起動時に実行する', async () => {
+      await requestScratch(Date.now(), 'Hi there');
+      const { provider, snap } = await setup();
+      await flush();
+      expect(snap().scratch.draft).toBe('Hi there');
+      expect(provider.calls[0].request).toMatchObject({ sourceText: 'Hi there' });
+    });
+
     it('自由入力はタブの切り替えで消えず、セッション一覧から選べる', async () => {
       const { controller, snap } = await setup();
       controller.setScratchDraft('memo');

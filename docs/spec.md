@@ -32,6 +32,7 @@ This document is the single source of truth for **kose**, a Chrome extension for
     - Shown when kose is invoked with no selection (the text area gets focus), when there are no sessions (with a one-line hint about the other ways to invoke kose), and when “✏️ Free input” is chosen in the header's session list, where it is always the first item.
     - The free-input review is a session with the special tab ID `SCRATCH_TAB_ID = -1` and `source: { tabId: -1, frameId: 0, tabTitle: <“Free input” in the UI language>, textSource: 'script', editable: false }`. It behaves like a tab's session (one at a time; running again replaces it; waiting-time quiz; mistakes are recorded), but no browser tab closes it, so it lasts until the browser exits.
     - The draft is saved in `chrome.storage.session` (never written to disk), like sessions.
+12. **Launch from outside Chrome** (e.g. a Windows shortcut, Ctrl+Alt+K): `chrome.exe "chrome-extension://<ID>/launch.html"` opens a small extension page. It reads the clipboard (`clipboardRead`; `navigator.clipboard.readText()`, falling back to `document.execCommand('paste')`), writes `scratchRequest` with the text, opens the kose window or brings it to the front, and closes its own tab. The kose window replaces the free-input draft with the text and runs it immediately. With an empty or unreadable clipboard it just opens the free input. Windows does not handle `chrome-extension://` itself, so the URL is passed to `chrome.exe`; no resident process is needed.
 
 ### 1.1 Languages
 
@@ -348,7 +349,7 @@ interface AIProvider {
 ### 5.1 Basics
 
 - MV3, TypeScript, Vite, React, Vitest, Zod.
-- Permissions: `contextMenus`, `storage`, `activeTab`, `scripting`. `optional_host_permissions`: Anthropic and OpenAI. No always-on `<all_urls>` content scripts. No `sidePanel`. The shortcut uses `commands` (no permission needed).
+- Permissions: `contextMenus`, `storage`, `activeTab`, `scripting`, `clipboardRead` (only used by `launch.html`). `optional_host_permissions`: Anthropic and OpenAI. No always-on `<all_urls>` content scripts. No `sidePanel`. The shortcut uses `commands` (no permission needed).
 - `"incognito": "not_allowed"`.
 - `minimum_chrome_version`: 138 (Prompt API for extensions).
 - Model output is rendered as text, never injected as HTML.
@@ -372,7 +373,7 @@ Listeners (`contextMenus.onClicked`, `action.onClicked`, `commands.onCommand` fo
 3. Write the pending request (`{ requestId, targetLanguage, text, source: SourceLocation, createdAt }`) to `chrome.storage.session` under a per-tab key. `targetLanguage` is the current `settings.targetLanguage`. The tab title comes from the `tab` argument of the event.
 4. Open the kose window, or bring the existing one to the front with `chrome.windows.update(id, { focused: true })` (can be disabled in options).
 5. The kose window watches pending requests both at startup and via `storage.onChanged` (subscribing before loading state to avoid races), creates a new session for the tab, starts processing and displays it.
-   - It also takes (reads and removes) `scratchRequest` and switches to the free input with focus. At startup, a `scratchRequest` older than a pending request is ignored, so the newer invocation wins.
+   - It also takes (reads and removes) `scratchRequest` (`{ at, text? }`) and switches to the free input with focus; with `text` it replaces the draft and runs it. At startup, a `scratchRequest` older than a pending request is ignored, so the newer invocation wins.
    - Running the free input builds the same kind of request (`source` for tab ID −1, current `targetLanguage`, `trimSelection` applied) and passes it to the same code path in the kose window; nothing goes through the service worker.
 6. Requests of the tab's previous session are cancelled with `AbortController`, and responses for old request IDs are discarded.
 

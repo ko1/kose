@@ -6,7 +6,10 @@ import type { PendingRequest, ReviewSession } from '../domain/types';
 const PENDING_PREFIX = 'pending:';
 const SESSION_PREFIX = 'session:';
 const WINDOW_KEY = 'koseWindowId';
-/** 選択なしで実行されたとき、koseウィンドウに自由入力を開かせる合図（値は時刻） */
+/**
+ * koseウィンドウに自由入力を開かせる合図。選択なしで実行されたときと、外部から起動用ページで
+ * クリップボードの文章を渡されたとき（text あり。そのまま実行する）に書く
+ */
 export const SCRATCH_REQUEST_KEY = 'scratchRequest';
 /** 自由入力の下書き。本文をディスクに書かないため session に置く */
 const SCRATCH_DRAFT_KEY = 'scratchDraft';
@@ -60,17 +63,25 @@ export async function setKoseWindowId(id: number): Promise<void> {
   await chrome.storage.session.set({ [WINDOW_KEY]: id });
 }
 
-export async function requestScratch(now = Date.now()): Promise<void> {
-  await chrome.storage.session.set({ [SCRATCH_REQUEST_KEY]: now });
+export interface ScratchRequest {
+  at: number;
+  /** 自由入力に入れて実行する文章 */
+  text?: string;
 }
 
-/** 自由入力を開く合図を取り出して消す。合図があればその時刻を返す */
-export async function takeScratchRequest(): Promise<number | undefined> {
+export async function requestScratch(now = Date.now(), text?: string): Promise<void> {
+  const request: ScratchRequest = text === undefined ? { at: now } : { at: now, text };
+  await chrome.storage.session.set({ [SCRATCH_REQUEST_KEY]: request });
+}
+
+/** 自由入力を開く合図を取り出して消す */
+export async function takeScratchRequest(): Promise<ScratchRequest | undefined> {
   const stored = await chrome.storage.session.get(SCRATCH_REQUEST_KEY);
-  const at = stored[SCRATCH_REQUEST_KEY];
-  if (at === undefined) return undefined;
+  const raw = stored[SCRATCH_REQUEST_KEY] as ScratchRequest | number | undefined;
+  if (raw === undefined) return undefined;
   await chrome.storage.session.remove(SCRATCH_REQUEST_KEY);
-  return typeof at === 'number' ? at : 0;
+  if (typeof raw === 'number') return { at: raw };
+  return { at: typeof raw.at === 'number' ? raw.at : 0, text: typeof raw.text === 'string' ? raw.text : undefined };
 }
 
 export async function loadScratchDraft(): Promise<string> {
