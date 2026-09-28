@@ -246,6 +246,16 @@ const en = {
     downloading: 'Downloading the model',
     unavailable: (reason: string) => `Unavailable — ${reason}`,
   },
+
+  launcher: {
+    heading: 'Run from other applications',
+    intro: 'Copy text in any application, then run this command: the kose window opens and runs on the copied text.',
+    copy: 'Copy',
+    copied: 'Copied',
+    win: 'Windows: right-click the desktop → New → Shortcut, paste this command, and set “Shortcut key” in its Properties (e.g. Ctrl+Alt+K). The path is Chrome’s standard location; if Chrome was installed for your user only, use %LOCALAPPDATA%\\Google\\Chrome\\Application\\chrome.exe. A path-independent alternative is cmd /c start "" chrome "<URL>" (a console window flashes briefly).',
+    mac: 'Mac: run this command from the Shortcuts app (“Run Shell Script”) and assign a keyboard shortcut to it.',
+    other: 'Assign this command to a keyboard shortcut in your desktop environment.',
+  },
 };
 
 export type Messages = typeof en;
@@ -485,6 +495,16 @@ const ja: Messages = {
     needsDownload: 'モデルのダウンロードが必要（初回実行時にkoseウィンドウから開始できます）',
     downloading: 'モデルをダウンロード中',
     unavailable: (reason: string) => `利用不可 — ${reason}`,
+  },
+
+  launcher: {
+    heading: 'ほかのアプリから使う',
+    intro: 'どのアプリでも文章をコピーしてからこのコマンドを実行すると、koseウィンドウが開いて、その文章で実行します。',
+    copy: 'コピー',
+    copied: 'コピーしました',
+    win: 'Windows：デスクトップを右クリック →「新規作成」→「ショートカット」でこのコマンドを貼り付け、プロパティの「ショートカット キー」を設定します（例：Ctrl+Alt+K）。パスは Chrome の標準のインストール先です。ユーザー単位でインストールした場合は %LOCALAPPDATA%\\Google\\Chrome\\Application\\chrome.exe にしてください。パスに依存しない書き方として cmd /c start "" chrome "<URL>" もあります（黒い画面が一瞬出ます）。',
+    mac: 'Mac：ショートカット.app の「シェルスクリプトを実行」でこのコマンドを実行し、キーボードショートカットを割り当てます。',
+    other: 'デスクトップ環境のキーボードショートカットに、このコマンドを割り当てます。',
   },
 };
 

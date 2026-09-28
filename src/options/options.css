@@ -144,3 +144,18 @@ button.link {
 .hint.warn {
   color: var(--warn-fg);
 }
+
+.command {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.command code {
+  flex: 1;
+  padding: 6px 8px;
+  overflow-wrap: anywhere;
+  background: var(--bg-subtle);
+  border-radius: var(--radius);
+  user-select: all;
+}

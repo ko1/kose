@@ -112,6 +112,7 @@ Rarely changed settings live on the options page.
   - A note that mistakes are recorded from explanations, so they increase only when an explanation is generated. When auto-save is on, a cloud provider is selected and cloud auto-explanation is off, a warning says that mistakes are recorded only after pressing “Show explanation”.
   - The list of saved mistakes (phrase pair, explanation, language, count, last seen, next review), newest first, with per-card delete and delete all (with confirmation). The list follows changes made in the kose window.
   - JSON export/import
+- “Run from other applications”: the launch command for the current OS with this extension's ID (`launchCommand()` in `shared/launcher.ts`; Windows: Chrome's standard path to chrome.exe, Mac: `open -a "Google Chrome"`, others: `google-chrome`), a copy button, and how to assign it to a key. The hint mentions the per-user install path and `cmd /c start "" chrome "<URL>"`, since an extension cannot learn where chrome.exe is.
 
 ## 2. Local learning data
 

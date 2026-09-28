@@ -4,6 +4,7 @@ import { BuiltinProvider } from '../ai/builtinProvider';
 import { OPENAI_ORIGIN } from '../ai/openaiProvider';
 import type { ProviderAvailability } from '../ai/provider';
 import { LANGUAGE_CODES, LanguageCode, MistakeCard } from '../domain/types';
+import { launchCommand } from '../shared/launcher';
 import { M } from '../shared/messages';
 import {
   ANTHROPIC_MODELS,
@@ -166,6 +167,8 @@ export function Options() {
 
       <MistakesSection settings={settings} save={save} />
 
+      <LauncherSection />
+
       <section>
         <h2>{M.options.window}</h2>
         <label className="checkbox">
@@ -182,6 +185,34 @@ export function Options() {
         {message}
       </p>
     </main>
+  );
+}
+
+/** ほかのアプリから起動するコマンド（この拡張の ID 入り）を表示してコピーできるようにする */
+function LauncherSection() {
+  const [os, setOs] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    chrome.runtime.getPlatformInfo().then((info) => setOs(info.os));
+  }, []);
+  if (os === null) return null;
+
+  const command = launchCommand(os, chrome.runtime.getURL('launch.html'));
+  const copy = async () => {
+    await navigator.clipboard.writeText(command);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+  return (
+    <section>
+      <h2>{M.launcher.heading}</h2>
+      <p className="hint">{M.launcher.intro}</p>
+      <div className="command">
+        <code>{command}</code>
+        <button onClick={copy}>{copied ? M.launcher.copied : M.launcher.copy}</button>
+      </div>
+      <p className="hint">{os === 'win' ? M.launcher.win : os === 'mac' ? M.launcher.mac : M.launcher.other}</p>
+    </section>
   );
 }
 
