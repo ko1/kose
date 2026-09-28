@@ -257,12 +257,13 @@ export class KoseController {
     if (patch.targetLanguage || patch.provider) this.prewarm();
   }
 
-  /** 上部の設定で同じ原文を再生成する。改稿の実行中なら、それを取り消してやり直す（run が前の要求を止める） */
+  /** 上部の設定で同じ原文を再生成する。実行中の改稿・解説・相談はすべて取り消す（改稿は run が止める） */
   async regenerate(tabId: number): Promise<void> {
     const session = this.sessions.get(tabId);
     if (!session) return;
-    // 相談の返答が作り直しと入れ違いに案を追加しないよう、実行中の相談は止める
+    // 新しい設定で作り直すので、古い前提の相談と解説は待たずに止める
     this.abortChat(tabId);
+    this.abortExplains(session);
     this.update(tabId, {
       ...session,
       targetLanguage: this.settings.targetLanguage,

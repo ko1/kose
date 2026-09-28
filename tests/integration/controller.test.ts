@@ -462,6 +462,21 @@ describe('KoseController', () => {
     expect(versions.map((v) => [v.origin, v.targetLanguage])).toEqual([['initial', 'ja']]);
   });
 
+  it('解説の生成中に作り直すと、解説も止める', async () => {
+    const { provider, controller, snap } = await setup();
+    await putPending(pending(1, 'こんにちは', 'en'));
+    await flush();
+    provider.answer(0, 'Hello.');
+    await flush();
+    expect(snap().explainStates[snap().displayed!.versions[0].id]?.kind).toBe('running');
+
+    await controller.updateSettings({ situation: 'business' });
+    void controller.regenerate(1);
+    await flush();
+    expect(provider.explainCalls[0].signal?.aborted).toBe(true);
+    expect(snap().explainStates).toEqual({});
+  });
+
   it('ドロップダウンの変更だけではAPIを呼ばず、再生成で新しいバージョンを追加する', async () => {
     const { provider, controller, snap } = await setup();
     await putPending(pending(1, '原文', 'en'));

@@ -43,7 +43,7 @@ export function App({ controller }: { controller: KoseController }) {
       </header>
       <SettingsBar
         settings={settings}
-        canRegenerate={!!displayed && chatState?.kind !== 'running' && settingsChanged(displayed, settings)}
+        canRegenerate={!!displayed && settingsChanged(displayed, settings)}
         onChange={(patch) => controller.updateSettings(patch)}
         onRegenerate={() => displayed && controller.regenerate(displayed.source.tabId)}
       />
@@ -103,7 +103,7 @@ export function App({ controller }: { controller: KoseController }) {
 
 /**
  * 上部の機能・用途が、表示中の案（改稿の実行中や案がなければ、最後に要求した設定）と違うか。
- * 実行中でも押せる（実行中の改稿を取り消して、新しい設定でやり直す）
+ * 何かの実行中でも押せる（改稿・解説・相談をすべて取り消して、新しい設定でやり直す）
  */
 function settingsChanged(session: ReviewSession, settings: Settings): boolean {
   const shown = session.status.kind === 'running' ? session : (currentVersion(session) ?? session);
