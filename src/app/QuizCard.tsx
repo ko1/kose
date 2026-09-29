@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react';
-import { quizChoices, type QuizChoice } from '../domain/quiz';
+import { quizChoices } from '../domain/quiz';
 import type { MistakeCard, Rating } from '../domain/types';
 import { M } from '../shared/messages';
 
 /**
  * 1枚分の復習クイズ（選択式）。誤った表現と直した表現から正しいほうを選ぶ。
- * 違う箇所に印を付けるので、一字一句見比べなくてよい。正解なら Good、不正解なら Again で自動的に記録する。
+ * 正解なら Good、不正解なら Again で自動的に記録する。
  */
 export function QuizCard({
   card,
@@ -19,12 +19,13 @@ export function QuizCard({
 }) {
   // 並び順は表示のたびに変えない
   const choices = useMemo(() => quizChoices(card), [card.id]);
-  const [chosen, setChosen] = useState<QuizChoice | null>(null);
+  const [chosen, setChosen] = useState<number | null>(null);
+  const correct = chosen !== null && choices[chosen].correct;
 
-  const choose = (choice: QuizChoice) => {
-    if (chosen) return;
-    setChosen(choice);
-    onRate(choice.correct ? 'good' : 'again');
+  const choose = (index: number) => {
+    if (chosen !== null) return;
+    setChosen(index);
+    onRate(choices[index].correct ? 'good' : 'again');
   };
 
   return (
@@ -34,29 +35,21 @@ export function QuizCard({
         {card.count > 1 && <span className="meta">{M.quiz.times(card.count)}</span>}
       </p>
       <div className="choices" role="group" aria-label={M.quiz.choicesLabel}>
-        {choices.map((choice) => (
+        {choices.map((c, i) => (
           <button
-            key={choice.text}
-            className={`choice${chosen ? (choice.correct ? ' choice-correct' : choice === chosen ? ' choice-wrong' : '') : ''}`}
-            onClick={() => choose(choice)}
+            key={i}
+            className={`choice${chosen !== null ? (c.correct ? ' choice-correct' : i === chosen ? ' choice-wrong' : '') : ''}`}
+            onClick={() => choose(i)}
             disabled={chosen !== null}
           >
-            {choice.parts.map((part, i) =>
-              part.mark === 'diff' ? (
-                <mark key={i}>{part.text}</mark>
-              ) : part.mark === 'gap' ? (
-                <span key={i} className="gap" aria-hidden />
-              ) : (
-                <span key={i}>{part.text}</span>
-              ),
-            )}
+            {c.text}
           </button>
         ))}
       </div>
-      {chosen && (
+      {chosen !== null && (
         <>
-          <p className={chosen.correct ? 'quiz-result correct' : 'quiz-result wrong'}>
-            {chosen.correct ? M.quiz.correct : M.quiz.incorrect}
+          <p className={correct ? 'quiz-result correct' : 'quiz-result wrong'}>
+            {correct ? M.quiz.correct : M.quiz.incorrect}
           </p>
           {card.explanation && <p className="change-explanation">{card.explanation}</p>}
           {onNext && <button onClick={onNext}>{M.quiz.next}</button>}

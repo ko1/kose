@@ -135,7 +135,7 @@ Rarely changed settings live on the options page.
 
 ## 3. Review quiz
 
-- **Multiple choice** (`domain/quiz.ts`): “Which is correct English/Japanese?” with the erroneous phrase (`before`) and the corrected phrase (`after`) as two buttons in random order, plus the count if the mistake was made more than once. So the user does not have to compare the phrases character by character, the parts that differ are marked in both options with the same neutral highlight (it does not tell which is right); where one option has text the other lacks (e.g. a missing period), the other shows a thin gap marker at that position (omitted next to a replaced part). The diff uses `diffTexts` (words for Latin script, characters otherwise).
+- **Multiple choice** (`domain/quiz.ts`): “Which is correct English/Japanese?” with the erroneous phrase (`before`) and the corrected phrase (`after`) as two plain buttons in random order, plus the count if the mistake was made more than once. The differences are deliberately not highlighted: the user reads both and picks the one that looks right.
 - Choosing an option shows whether it was right (the correct option turns green, a wrong choice red) and the explanation, and records the rating automatically: correct → Good, wrong → Again. (Hard / Easy remain in the scheduler but are not offered in the quiz.)
 - The AI is not involved in quizzes.
 - Spaced repetition uses a **simplified SM-2** (`domain/srs.ts`, independent and unit-tested). Cards have `dueAt`, `lastReviewedAt`, `repetitions`, `easeFactor` (initial 2.5, minimum 1.3), `intervalDays`.

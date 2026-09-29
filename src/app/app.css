@@ -419,23 +419,6 @@ button.link {
   color: inherit;
 }
 
-/* 違う箇所の印。どちらが正しいかは示さない中立の色 */
-.choice mark {
-  background: var(--warn-bg);
-  color: inherit;
-  border-bottom: 2px solid var(--warn-fg);
-}
-
-/* 片方にしかない箇所の、もう片方での位置 */
-.choice .gap {
-  display: inline-block;
-  width: 2px;
-  height: 1em;
-  margin: 0 2px;
-  vertical-align: text-bottom;
-  background: var(--warn-fg);
-}
-
 .choice-correct {
   border: 2px solid var(--ins-fg);
   background: var(--ins-bg);
