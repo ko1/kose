@@ -206,7 +206,7 @@ const en = {
     geminiNote:
       'Get an API key at Google AI Studio (aistudio.google.com). There is a free tier; on the free tier Google may use the content to improve its products.',
     openrouterNote:
-      'Log in with OpenRouter to get a key without copying it. Usage is paid from your OpenRouter credits; OpenRouter forwards the text to the model’s provider.',
+      'Log in with OpenRouter to get a key without copying it. Usage is paid from your OpenRouter credits; OpenRouter forwards the text to the model’s provider. kose asks OpenRouter to use only providers that do not store or train on the data; if a model has none, the request fails instead of going elsewhere.',
     openrouterLogin: 'Log in with OpenRouter',
     openrouterLoginNote: 'Opens OpenRouter; after you allow it, the API key is saved here.',
     openrouterLoggedIn: 'Logged in to OpenRouter. The API key was saved.',
@@ -490,7 +490,7 @@ const ja: Messages = {
     geminiNote:
       'API キーは Google AI Studio（aistudio.google.com）で取得します。無料枠があります。無料枠では、送った内容が Google の製品改善に使われることがあります。',
     openrouterNote:
-      '「OpenRouter でログイン」なら、キーをコピーせずに設定できます。料金は OpenRouter のクレジットから支払われ、文章は OpenRouter を経由して各モデルの提供元に送られます。',
+      '「OpenRouter でログイン」なら、キーをコピーせずに設定できます。料金は OpenRouter のクレジットから支払われ、文章は OpenRouter を経由して各モデルの提供元に送られます。kose は、送った内容を保存・学習に使わない提供元だけを使うよう OpenRouter に指定します。該当する提供元がないモデルでは、ほかに回さずエラーになります。',
     openrouterLogin: 'OpenRouter でログイン',
     openrouterLoginNote: 'OpenRouter の画面が開きます。許可すると、ここに API キーが保存されます。',
     openrouterLoggedIn: 'OpenRouter にログインし、API キーを保存しました。',

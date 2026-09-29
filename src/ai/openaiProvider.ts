@@ -86,8 +86,9 @@ export const OPENROUTER_SPEC: CompatibleSpec = {
   // OpenRouter のアプリ一覧での表示名
   extraHeaders: { 'HTTP-Referer': 'https://github.com/ko1/kose', 'X-Title': 'kose' },
   extraBody: {
-    // 構造化出力に対応する接続先にだけ振り分ける。料金も応答に含めてもらう
-    provider: { require_parameters: true },
+    // 構造化出力に対応し、かつ送った内容を保存・学習に使わない接続先にだけ振り分ける
+    // （該当がなければ別の接続先に回さずエラーになる）。料金も応答に含めてもらう
+    provider: { require_parameters: true, data_collection: 'deny' },
     usage: { include: true },
   },
 };

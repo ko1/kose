@@ -18,7 +18,7 @@ kose is a Chrome extension that rewrites text you select into good Japanese or g
 | Claude (Anthropic API) | The text you run kose on, its rewrites, the chosen mode and situation, your nuance-chat messages, and the language for explanations | `api.anthropic.com`, using your own API key |
 | OpenAI API | Same as above | `api.openai.com`, using your own API key |
 | Gemini API (Google) | Same as above | `generativelanguage.googleapis.com`, using your own API key. On Google's free tier, Google may use the content to improve its products. |
-| OpenRouter | Same as above | `openrouter.ai`, using your OpenRouter key; OpenRouter forwards it to the provider of the model you choose |
+| OpenRouter | Same as above | `openrouter.ai`, using your OpenRouter key; OpenRouter forwards it to the provider of the model you choose. kose asks OpenRouter to use only providers that do not store or train on the data (`data_collection: deny`). |
 | Ollama | Same as above | Ollama on your own computer (`localhost` / `127.0.0.1`); nothing leaves your computer |
 
 - Data is sent only when you run kose, press “Show explanation”, send a chat message, or enable automatic explanations for cloud providers.
@@ -73,7 +73,7 @@ kose は、選択した文章をよい日本語・よい英語に改善する Ch
 | Claude（Anthropic API） | kose にかけた文章、改稿文、選んだ機能と用途、ニュアンス相談のメッセージ、解説に使う言語 | `api.anthropic.com`（あなた自身の API キーを使用） |
 | OpenAI API | 同上 | `api.openai.com`（あなた自身の API キーを使用） |
 | Gemini API（Google） | 同上 | `generativelanguage.googleapis.com`（あなた自身の API キーを使用）。Google の無料枠では、送った内容が Google の製品改善に使われることがあります。 |
-| OpenRouter | 同上 | `openrouter.ai`（あなたの OpenRouter のキーを使用）。OpenRouter が、選んだモデルの提供元に転送します |
+| OpenRouter | 同上 | `openrouter.ai`（あなたの OpenRouter のキーを使用）。OpenRouter が、選んだモデルの提供元に転送します。kose は、保存・学習に使わない提供元だけを使うよう指定します（`data_collection: deny`）。 |
 | Ollama | 同上 | あなたのパソコンの Ollama（`localhost` / `127.0.0.1`）。パソコンの外には出ません |
 
 - 送信するのは、kose を実行したとき、「解説を見る」を押したとき、相談を送ったとき、クラウドでの解説の自動生成をオンにしているときだけです。

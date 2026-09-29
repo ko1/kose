@@ -286,7 +286,7 @@ describe('OpenAICompatibleProvider (Gemini / OpenRouter / Ollama)', () => {
     const result = await new OpenAICompatibleProvider(OPENROUTER_SPEC, config, fetchImpl).rewrite(request);
     const [, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
     const body = JSON.parse(init.body as string);
-    expect(body.provider).toEqual({ require_parameters: true });
+    expect(body.provider).toEqual({ require_parameters: true, data_collection: 'deny' });
     expect(body.usage).toEqual({ include: true });
     expect((init.headers as Record<string, string>)['X-Title']).toBe('kose');
     expect(result.usage).toEqual({ model: 'openai/gpt-5-mini', inputTokens: 120, outputTokens: 30, costUsd: 0.00042 });

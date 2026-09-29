@@ -187,7 +187,7 @@ One implementation (`OpenAICompatibleProvider` in `ai/openaiProvider.ts`) calls 
 | --- | --- | --- | --- |
 | OpenAI | `api.openai.com/v1` | yes | default model `gpt-5-mini` |
 | Gemini | `generativelanguage.googleapis.com/v1beta/openai` | yes (Google AI Studio) | default `gemini-2.5-flash`; free tier (content may be used by Google to improve products) |
-| OpenRouter | `openrouter.ai/api/v1` | yes, or “Log in with OpenRouter” | default `openai/gpt-5-mini`; `provider.require_parameters` so requests go only to endpoints that support structured output; `usage.include` so the response carries the cost (USD), which is shown like Claude's |
+| OpenRouter | `openrouter.ai/api/v1` | yes, or “Log in with OpenRouter” | default `openai/gpt-5-mini`; `provider.require_parameters` and `provider.data_collection: "deny"` so requests go only to endpoints that support structured output and do not store or train on the data (fail closed: an error instead of another endpoint); `usage.include` so the response carries the cost (USD), which is shown like Claude's |
 | Ollama | `<server URL>/v1` (default `http://localhost:11434`) | no | local, `sendsExternally: false` (explanations run automatically); only localhost / 127.0.0.1 can be allowed; a 403 means `OLLAMA_ORIGINS=chrome-extension://*` is needed, a connection error means Ollama is not running |
 
 - Output is requested with Structured Outputs (`response_format: json_schema`, strict). If an endpoint/model rejects the schema (400/404), kose retries once with `json_object` and remembers that for the endpoint and model; the prompts list the output fields and the result is validated with Zod either way.
