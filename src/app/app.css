@@ -391,29 +391,72 @@ button.link {
   gap: 6px;
 }
 
-.quiz-prompt,
-.quiz-before,
-.quiz-after {
+.quiz-prompt {
   margin: 0;
 }
 
-.quiz-before,
-.quiz-after {
-  font-size: 16px;
+.choices {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
 }
 
-.quiz input {
-  width: 100%;
-  padding: 4px 8px;
+.choice {
+  padding: 6px 10px;
+  font-size: 16px;
+  text-align: left;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  cursor: pointer;
 }
 
-.ratings {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+.choice:disabled {
+  cursor: default;
+  color: inherit;
+}
+
+/* 違う箇所の印。どちらが正しいかは示さない中立の色 */
+.choice mark {
+  background: var(--warn-bg);
+  color: inherit;
+  border-bottom: 2px solid var(--warn-fg);
+}
+
+/* 片方にしかない箇所の、もう片方での位置 */
+.choice .gap {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin: 0 2px;
+  vertical-align: text-bottom;
+  background: var(--warn-fg);
+}
+
+.choice-correct {
+  border: 2px solid var(--ins-fg);
+  background: var(--ins-bg);
+}
+
+.choice-wrong {
+  border: 2px solid var(--del-fg);
+  background: var(--del-bg);
+}
+
+.quiz-result {
+  margin: 0;
+  font-weight: bold;
+}
+
+.quiz-result.correct {
+  color: var(--ins-fg);
+}
+
+.quiz-result.wrong {
+  color: var(--del-fg);
 }
 
 .scratch textarea {
