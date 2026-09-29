@@ -104,8 +104,9 @@ async function capture(target: chrome.scripting.InjectionTarget, base: SourceLoc
         },
       };
     }
-  } catch {
+  } catch (e) {
     // 呼び出し側で selectionText にフォールバックする（改行が失われている可能性をUIで表示）
+    console.warn('kose: failed to read the selection', e);
   }
   return null;
 }
