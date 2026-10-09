@@ -10,7 +10,7 @@ This document is the single source of truth for **kose**, a Chrome extension for
 
 ## 1. UX
 
-1. The user selects text on a web page and invokes kose in one of three ways: the single right-click item **“kose: Make it good Japanese” / “kose: Make it good English”**, the kose toolbar button, or the **Alt+K** shortcut (`commands`, changeable at `chrome://extensions/shortcuts`). All three use the **last chosen target** (`settings.targetLanguage`): **“Make it good Japanese”** or **“Make it good English”**. The user switches the target in the kose window's “Mode” dropdown and regenerates; that choice becomes the target for the next invocation, and the menu item / button title follow it.
+1. The user selects text on a web page and invokes kose in one of three ways: the single right-click item **“kose: Improve the writing”**, the kose toolbar button, or the **Alt+K** shortcut (`commands`, changeable at `chrome://extensions/shortcuts`). All three use the **last chosen target** (`settings.targetLanguage`): **“Make it good Japanese”** or **“Make it good English”**. The user switches the target with the kose window's “Mode” buttons; that choice becomes the target for the next invocation. The menu item and the button title do not name the language.
    - Only one right-click item exists because Chrome folds two or more top-level items of one extension into a submenu. The target cannot be inferred from the text: English text may need proofreading or translation into Japanese.
    - The toolbar button and shortcut search all frames for a selection. With no selection (or on pages scripts cannot access), they open the kose window on the **free input** (item 11).
 2. One click opens the **kose window** (a single standalone window, §5.2) or brings it to the front, and processing starts immediately with the last chosen target. There is no "Review" button to press.
@@ -378,7 +378,7 @@ interface AIProvider {
 
 ### 5.3 Invocation sequence
 
-Listeners (`contextMenus.onClicked`, `action.onClicked`, `commands.onCommand` for `run-kose`) are registered at the top level of the service worker. The single menu item (`id: 'kose'`, context `selection`) is created in `runtime.onInstalled` and `runtime.onStartup`, which also set the toolbar button title (`action.setTitle` does not survive a browser restart). Both show the current target, e.g. “kose: Make it good English”, and are updated when `settings.targetLanguage` changes (`storage.onChanged`). Menu creation is awaited; if updating the title fails because the item does not exist yet, the menu is recreated.
+Listeners (`contextMenus.onClicked`, `action.onClicked`, `commands.onCommand` for `run-kose`) are registered at the top level of the service worker. The single menu item (`id: 'kose'`, context `selection`) is created in `runtime.onInstalled` and `runtime.onStartup`, which also set the toolbar button title (`action.setTitle` does not survive a browser restart). Both show “kose: Improve the writing” (Japanese UI: “kose: よりよい文章にする”), without the target.
 
 1. Read the selection with line breaks via `chrome.scripting.executeScript` with `captureSelection` (allowed by `activeTab`). Selections inside `textarea`/`input` are read with `value.slice(selectionStart, selectionEnd)`.
    - Right-click: only the clicked frame (`frameIds: [info.frameId]`). On failure (PDF viewer, Chrome internal pages, …) fall back to `info.selectionText` and show that line breaks may be lost.

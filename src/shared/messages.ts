@@ -152,7 +152,7 @@ const en = {
   },
 
   menu: {
-    invokeTitle: (target: string) => `kose: Make it ${target}`,
+    invokeTitle: 'kose: Improve the writing',
   },
 
   errors: {
@@ -442,7 +442,7 @@ const ja: Messages = {
   },
 
   menu: {
-    invokeTitle: (target: string) => `kose: ${target}にする`,
+    invokeTitle: 'kose: よりよい文章にする',
   },
 
   errors: {

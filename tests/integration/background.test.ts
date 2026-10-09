@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createMenus, handleInvoke, handleMenuClick, handleTabRemoved, updateInvokeTitles } from '../../src/background/handlers';
+import { createMenus, handleInvoke, handleMenuClick, handleTabRemoved } from '../../src/background/handlers';
 import { trimSelection } from '../../src/domain/text';
 import { saveBoundsIfKose } from '../../src/background/koseWindow';
 import type { PendingRequest } from '../../src/domain/types';
@@ -11,27 +11,12 @@ const click = (menuItemId: string, extra: Partial<chrome.contextMenus.OnClickDat
 const tab = (id: number, title = `Tab ${id}`) => ({ id, title }) as chrome.tabs.Tab;
 
 describe('context menu', () => {
-  it('最後に選んだ機能を示す1項目だけを作り、ボタンの表示も合わせる', async () => {
+  it('言語を含まない1項目だけを作り、ボタンの表示も合わせる', async () => {
     const c = fakeChrome();
     await saveSettings({ targetLanguage: 'ja' });
     await createMenus();
-    expect(c.contextMenus.created).toEqual([{ id: 'kose', title: 'kose: Make it good Japanese', contexts: ['selection'] }]);
-    expect(c.action.title).toBe('kose: Make it good Japanese');
-  });
-
-  it('項目がまだ無いときの表示名の更新は、項目を作り直す', async () => {
-    const c = fakeChrome();
-    await saveSettings({ targetLanguage: 'ja' });
-    await updateInvokeTitles('ja');
-    expect(c.contextMenus.created).toEqual([{ id: 'kose', title: 'kose: Make it good Japanese', contexts: ['selection'] }]);
-  });
-
-  it('機能を変えると表示を更新する', async () => {
-    const c = fakeChrome();
-    await createMenus();
-    await updateInvokeTitles('ja');
-    expect((c.contextMenus.created[0] as { title: string }).title).toBe('kose: Make it good Japanese');
-    expect(c.action.title).toBe('kose: Make it good Japanese');
+    expect(c.contextMenus.created).toEqual([{ id: 'kose', title: 'kose: Improve the writing', contexts: ['selection'] }]);
+    expect(c.action.title).toBe('kose: Improve the writing');
   });
 });
 

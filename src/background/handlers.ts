@@ -1,4 +1,4 @@
-import type { LanguageCode, PendingRequest, SourceLocation } from '../domain/types';
+import type { PendingRequest, SourceLocation } from '../domain/types';
 import { newId } from '../shared/ids';
 import { M } from '../shared/messages';
 import { trimSelection } from '../domain/text';
@@ -9,16 +9,10 @@ import { ensureKoseWindow } from './koseWindow';
 
 export const MENU_ID = 'kose';
 
-/** 右クリックメニュー・ツールバーボタンの表示。最後に選んだ機能を示す */
-export function invokeTitle(targetLanguage: LanguageCode): string {
-  return M.menu.invokeTitle(M.languages[targetLanguage].target);
-}
-
 /** 右クリックは1項目だけにする（2項目以上だと Chrome が拡張名のサブメニューにまとめてしまう） */
+/** 表示名は言語を含めない（日本語・英語は koseウィンドウで選ぶ） */
 export async function createMenus(): Promise<void> {
-  const { targetLanguage } = await loadSettings();
-  const title = invokeTitle(targetLanguage);
-  // 作成が終わるまで待つ（直後の表示名の更新が、まだ無い項目に対して失敗しないように）
+  const title = M.menu.invokeTitle;
   await chrome.contextMenus.removeAll();
   await new Promise<void>((resolve, reject) =>
     chrome.contextMenus.create({ id: MENU_ID, title, contexts: ['selection'] }, () => {
@@ -28,17 +22,6 @@ export async function createMenus(): Promise<void> {
     }),
   );
   await chrome.action.setTitle({ title });
-}
-
-export async function updateInvokeTitles(targetLanguage: LanguageCode): Promise<void> {
-  const title = invokeTitle(targetLanguage);
-  await chrome.action.setTitle({ title });
-  try {
-    await chrome.contextMenus.update(MENU_ID, { title });
-  } catch {
-    // 項目がまだ無い（作成前・作成失敗）なら作り直す。作り直しは最新の設定を読む
-    await createMenus();
-  }
 }
 
 export async function handleMenuClick(

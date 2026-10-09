@@ -1,5 +1,4 @@
-import { onSettingsChanged } from '../storage/settings';
-import { createMenus, handleInvoke, handleMenuClick, handleTabRemoved, updateInvokeTitles } from './handlers';
+import { createMenus, handleInvoke, handleMenuClick, handleTabRemoved } from './handlers';
 import { saveBoundsIfKose } from './koseWindow';
 
 // MV3 service worker ではリスナーをトップレベルで同期的に登録する
@@ -7,14 +6,6 @@ import { saveBoundsIfKose } from './koseWindow';
 const setupMenus = () => createMenus().catch((e) => console.error('kose: failed to create menus', e));
 chrome.runtime.onInstalled.addListener(setupMenus);
 chrome.runtime.onStartup.addListener(setupMenus);
-
-// 機能を変えたら（koseウィンドウ上部で選んだときも）メニューとボタンの表示を合わせる
-let lastTarget: string | undefined;
-onSettingsChanged((settings) => {
-  if (settings.targetLanguage === lastTarget) return;
-  lastTarget = settings.targetLanguage;
-  updateInvokeTitles(settings.targetLanguage).catch(() => {});
-});
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   handleMenuClick(info, tab).catch((e) => console.error('kose: failed to handle menu click', e));

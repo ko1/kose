@@ -55,7 +55,7 @@ KOSE_WIN_DIR=/mnt/c/Users/<you>/kose-dist npm run build:win   # custom destinati
 
 ## Usage
 
-1. Select text, then right-click → “kose: …”, click the kose toolbar button, or press Alt+K (change the key at `chrome://extensions/shortcuts`). The menu item shows the current target, e.g. “kose: Make it good English”.
+1. Select text, then right-click → “kose: …”, click the kose toolbar button, or press Alt+K (change the key at `chrome://extensions/shortcuts`). The menu item is “kose: Improve the writing”; the target is the one last chosen in the kose window.
 2. The kose window opens (or comes to the front) and processing starts immediately
 3. “Copy” copies the rewrite. Writing back into the page is not implemented.
 4. Press Japanese or English in “Make it good [Japanese|English]” at the top to regenerate from the same original at once. To change “Situation”, choose it and press “kose” next to it (choosing alone does not call the AI). The chosen settings are used for the next invocation.
@@ -171,7 +171,7 @@ Also check that the “Technical discussion” situation keeps identifiers and U
 
 ### Other checks
 
-- The right-click menu, the toolbar button and Alt+K all run with the current “Mode”, and the menu item / button title follow a change of “Mode”
+- The right-click menu, the toolbar button and Alt+K all run with the current “Mode”
 - Selections inside a GitHub comment box (textarea), inside iframes (toolbar button / Alt+K) and multi-paragraph selections keep their line breaks
 - Closing and reopening the kose window restores its position/size and the other tabs' reviews
 - Closing the kose window while a request is running shows “Processing was interrupted.” with a retry button when reopened
