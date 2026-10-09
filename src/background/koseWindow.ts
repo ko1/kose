@@ -25,11 +25,10 @@ export function ensureKoseWindow(focus: boolean): Promise<number> {
     }
     const stored = await chrome.storage.local.get(BOUNDS_KEY);
     const bounds: Bounds = { ...DEFAULT_BOUNDS, ...(stored[BOUNDS_KEY] as Bounds | undefined) };
-    const win = await chrome.windows.create({
-      url: chrome.runtime.getURL(KOSE_PAGE),
-      type: 'popup',
-      focused: true,
-      ...bounds,
+    const win = await createKoseWindow(bounds).catch((e: unknown) => {
+      // 保存位置が外したモニタ上などで画面外になると作成が拒否されるので、位置を捨てて作り直す
+      console.warn('kose: saved window bounds rejected, using defaults', e);
+      return createKoseWindow(DEFAULT_BOUNDS);
     });
     if (win?.id === undefined) throw new Error(M.window.windowCreateFailed);
     await setKoseWindowId(win.id);
@@ -38,6 +37,15 @@ export function ensureKoseWindow(focus: boolean): Promise<number> {
   const next = (inFlight ?? Promise.resolve(0)).catch(() => 0).then(run);
   inFlight = next;
   return next;
+}
+
+function createKoseWindow(bounds: Bounds): Promise<chrome.windows.Window | undefined> {
+  return chrome.windows.create({
+    url: chrome.runtime.getURL(KOSE_PAGE),
+    type: 'popup',
+    focused: true,
+    ...bounds,
+  });
 }
 
 export async function findKoseWindow(): Promise<number | undefined> {
