@@ -33,10 +33,11 @@ const en = {
 
   settingsBar: {
     target: 'Mode',
-    targetOption: (target: string) => `Make it ${target}`,
+    targetPrefix: 'Make it good',
+    targetSuffix: '',
     situation: 'Situation',
-    apply: 'Apply',
-    applyTitle: 'Rewrite the same original when the mode or situation differs from the displayed version',
+    apply: 'kose',
+    applyTitle: 'Rewrite the displayed original for the selected situation',
     external: (name: string, model: string) => `Sent externally: ${name} (${model})`,
     localOllama: (model: string) => `AI: local (Ollama ${model})`,
     externalAnthropic: (model: string, explainModel: string) =>
@@ -52,6 +53,12 @@ const en = {
     placeholder: 'Write text here and press Ctrl+Enter to run kose',
     label: 'Free input',
     run: 'kose',
+    noteOpen: '+ Note',
+    noteClose: '− Close note',
+    noteWith: (text: string) => `+ Note: ${text}`,
+    noteToggleTitle: 'Add a note for kose, such as the purpose or the audience',
+    notePlaceholder: 'Note for kose (e.g. a talk at an academic conference, for non-native readers)',
+    noteLabel: 'Note',
     usage: 'You can also select text on a page and use right-click → “kose”, the toolbar button, or Alt+K.',
   },
 
@@ -318,10 +325,11 @@ const ja: Messages = {
 
   settingsBar: {
     target: '機能',
-    targetOption: (target: string) => `${target}にする`,
+    targetPrefix: 'よい',
+    targetSuffix: 'にする',
     situation: '用途',
-    apply: '変更',
-    applyTitle: '表示中の案と機能・用途が違うときに、同じ原文から作り直します',
+    apply: 'kose',
+    applyTitle: '選んだ用途で、表示中の原文から作り直します',
     external: (name: string, model: string) => `外部送信: ${name}（${model}）`,
     localOllama: (model: string) => `AI: ローカル（Ollama ${model}）`,
     externalAnthropic: (model: string, explainModel: string) =>
@@ -337,6 +345,12 @@ const ja: Messages = {
     placeholder: 'ここに文章を書いて、Ctrl+Enter で kose にかけます',
     label: '自由入力',
     run: 'kose',
+    noteOpen: '+ 補足',
+    noteClose: '− 補足を閉じる',
+    noteWith: (text: string) => `+ 補足: ${text}`,
+    noteToggleTitle: '目的や読み手など、kose への補足を書きます',
+    notePlaceholder: 'kose への補足（例: XX学会で発表したい、英語が母語でない人向け）',
+    noteLabel: '補足',
     usage: 'ページで文章を選んで、右クリック →「kose」、ツールバーボタン、Alt+K でも実行できます。',
   },
 

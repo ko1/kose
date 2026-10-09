@@ -786,6 +786,24 @@ describe('KoseController', () => {
       expect(snap().displayed?.versions[0].result.revisedText).toBe('Hello world.');
     });
 
+    it('補足を保存し、改稿に指示として渡す。作り直しでも同じ補足を使う', async () => {
+      const { controller, provider, snap } = await setup();
+      controller.setScratchDraft('Hello wrld.');
+      controller.setScratchNote('  学会で発表する  ');
+      await flush();
+      expect(fakeChrome().storage.session.data.scratchNote).toBe('  学会で発表する  ');
+      void controller.runScratch();
+      await flush();
+      expect(provider.calls[0].request).toMatchObject({ sourceText: 'Hello wrld.', note: '学会で発表する' });
+      expect(snap().displayed?.note).toBe('学会で発表する');
+
+      provider.answer(0, 'Hello world.');
+      await flush();
+      void controller.regenerate(SCRATCH_TAB_ID);
+      await flush();
+      expect(provider.calls.at(-1)!.request).toMatchObject({ note: '学会で発表する' });
+    });
+
     it('空の下書きは実行しない', async () => {
       const { controller, provider } = await setup();
       controller.setScratchDraft('   \n ');

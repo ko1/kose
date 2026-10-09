@@ -23,7 +23,9 @@ import {
   isPendingKey,
   loadAll,
   loadScratchDraft,
+  loadScratchNote,
   saveScratchDraft,
+  saveScratchNote,
   saveSession,
   SCRATCH_REQUEST_KEY,
   takePending,
@@ -59,7 +61,7 @@ export interface ControllerSnapshot {
   /** 表示中のセッション。自由入力でまだ実行していなければ null */
   displayed: ReviewSession | null;
   /** 自由入力の下書きと、入力欄にフォーカスする合図（増えたらフォーカス） */
-  scratch: { draft: string; focusSeq: number };
+  scratch: { draft: string; note: string; focusSeq: number };
   /** Chrome内蔵モデルのダウンロード状況。ダウンロード中でなければ null */
   download: DownloadState | null;
   /** 表示中セッションの生成途中の改稿文。生成中でなければ null */
@@ -87,6 +89,7 @@ export class KoseController {
   /** セッションがなければ自由入力を表示する */
   private displayedTabId: number = SCRATCH_TAB_ID;
   private scratchDraft = '';
+  private scratchNote = '';
   private scratchFocusSeq = 0;
   /** 初期化が済んだか。済む前に届いた自由入力の合図は init でまとめて取り出す */
   private initialized = false;
@@ -113,6 +116,7 @@ export class KoseController {
     this.settings = await loadSettings();
     this.cards = await loadMistakes();
     this.scratchDraft = await loadScratchDraft();
+    this.scratchNote = await loadScratchNote();
     this.ownWindowId = (await chrome.windows.getCurrent()).id;
     // 読み込み中に届いた要求を取りこぼさないよう、先に購読する（重複は acceptPending が除く）
     this.listen();
@@ -246,6 +250,12 @@ export class KoseController {
     void saveScratchDraft(draft);
   }
 
+  setScratchNote(note: string): void {
+    this.scratchNote = note;
+    this.emit();
+    void saveScratchNote(note);
+  }
+
   /** 自由入力の下書きを、選択範囲と同じように kose にかける。下書きは残す */
   async runScratch(): Promise<void> {
     const text = trimSelection(this.scratchDraft);
@@ -256,6 +266,7 @@ export class KoseController {
       text,
       source: SCRATCH_SOURCE,
       createdAt: Date.now(),
+      ...(this.scratchNote.trim() ? { note: this.scratchNote.trim() } : {}),
     });
   }
 
@@ -351,6 +362,7 @@ export class KoseController {
           situation: version.situation,
           reviewStructure: needsStructureReview(version.result.revisedText),
           explanationLanguage: uiLanguage(),
+          note: session.note,
         },
         abort.signal,
         (partial) => {
@@ -509,6 +521,7 @@ export class KoseController {
       sourceText: session.sourceText,
       targetLanguage: session.targetLanguage,
       situation: session.situation,
+      note: session.note,
     };
     this.partials.delete(tabId);
     this.setStatus(tabId, { kind: 'running', requestId, startedAt: Date.now() });
@@ -622,7 +635,7 @@ export class KoseController {
       sessions: this.sortedSessions(),
       displayedTabId: this.displayedTabId,
       displayed: this.sessions.get(this.displayedTabId) ?? null,
-      scratch: { draft: this.scratchDraft, focusSeq: this.scratchFocusSeq },
+      scratch: { draft: this.scratchDraft, note: this.scratchNote, focusSeq: this.scratchFocusSeq },
       download: this.download,
       partialText: this.partials.get(this.displayedTabId) ?? null,
       explainStates: Object.fromEntries(this.explainStates),

@@ -13,6 +13,8 @@ const WINDOW_KEY = 'koseWindowId';
 export const SCRATCH_REQUEST_KEY = 'scratchRequest';
 /** 自由入力の下書き。本文をディスクに書かないため session に置く */
 const SCRATCH_DRAFT_KEY = 'scratchDraft';
+/** 自由入力の補足。下書きと同じく session に置く */
+const SCRATCH_NOTE_KEY = 'scratchNote';
 
 export const pendingKey = (tabId: number) => `${PENDING_PREFIX}${tabId}`;
 export const sessionKey = (tabId: number) => `${SESSION_PREFIX}${tabId}`;
@@ -92,4 +94,14 @@ export async function loadScratchDraft(): Promise<string> {
 
 export async function saveScratchDraft(draft: string): Promise<void> {
   await chrome.storage.session.set({ [SCRATCH_DRAFT_KEY]: draft });
+}
+
+export async function loadScratchNote(): Promise<string> {
+  const stored = await chrome.storage.session.get(SCRATCH_NOTE_KEY);
+  const note = stored[SCRATCH_NOTE_KEY];
+  return typeof note === 'string' ? note : '';
+}
+
+export async function saveScratchNote(note: string): Promise<void> {
+  await chrome.storage.session.set({ [SCRATCH_NOTE_KEY]: note });
 }

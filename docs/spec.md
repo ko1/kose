@@ -24,11 +24,12 @@ This document is the single source of truth for **kose**, a Chrome extension for
    - The explanation is written in the browser UI language (§1.4) and titled “Explanation”. It lists changes, distinguishes objective errors from optional style improvements, and warns about possible changes of meaning and ambiguities. If no change is needed, kose says so.
    - For long texts (500+ characters or 3+ paragraphs) the explanation also reviews the **structure** (構成): a one-line outline per paragraph and issues with the order of ideas, flow, transitions, repetition, paragraph breaks and the conventions of the situation, each with a suggestion. The rewrite itself never restructures the text. “Create a version that applies the structure suggestions” sends the issues to the chat, which creates a restructured version.
 6. Below that is the chat **“Discuss the nuance”**. With the session's original, rewrite history and situation as context, the user can discuss meaning and wording. When the chat produces a new rewrite, Result is updated. Earlier versions can be restored.
-7. At the top (under the header) are the “Mode” (Make it good Japanese / good English, i.e. the target language) and “Situation” dropdowns and a “Apply” (regenerate with these settings) button, enabled only when the dropdowns differ from the displayed version (or, with no version yet, from the last request) It is enabled even while something is running; while a rewrite is running it is compared with the running request's settings. Pressing it cancels every running job of the session — the rewrite, explanations and a pending chat reply — and starts over with the new settings (no need to wait, e.g. when switching from English to Japanese mid-translation). A cancelled explanation can be requested again with “Show explanation”; a chat message whose reply was cancelled stays in the conversation without a reply. A chat reply that arrives while a rewrite is running is discarded. Settings are stored in `chrome.storage.local`. Changing a dropdown does not call the API; regeneration does. The “Mode” value is also the target of the next invocation (item 1).
+7. At the top (under the header) are the “Mode” choice, shown as the sentence “Make it good [Japanese|English]” with the two languages as toggle buttons, the “Situation” dropdown and a “kose” button (regenerate with these settings). Pressing a language button regenerates the displayed session at once; changing the situation waits for the “kose” button, so that browsing the dropdown does not call the API. The “kose” button is enabled only when the settings differ from the displayed version (or, with no version yet, from the last request), and is hidden on the free input, which has its own “kose” button. It is enabled even while something is running; while a rewrite is running it is compared with the running request's settings. Regenerating cancels every running job of the session — the rewrite, explanations and a pending chat reply — and starts over with the new settings (no need to wait, e.g. when switching from English to Japanese mid-translation). A cancelled explanation can be requested again with “Show explanation”; a chat message whose reply was cancelled stays in the conversation without a reply. A chat reply that arrives while a rewrite is running is discarded. Settings are stored in `chrome.storage.local`. The “Mode” value is also the target of the next invocation (item 1).
 8. **There is no "save mistake" button.** Only clear, real grammatical/usage errors are detected and saved locally, automatically (§2). Optional rewording and translation differences are never called "the user's mistakes".
 9. While the rewrite runs, one due mistake may be shown as a quiz (§3).
 10. Writing the result back into the page (Apply/Replace) is not implemented; the result is copied with Copy. Rules for implementing it are in §5.6.
 11. **Free input** (“✏️ Free input”, like Emacs's `*scratch*`): a text area in the kose window for text that is not on a page. Ctrl+Enter (or “kose”) runs kose on it with the current “Mode” and “Situation”, exactly like a selection; the result is shown below the text area with the usual review display. The draft is kept after running.
+    - “+ Note” at the bottom left opens a small text area for a note to kose about this text (e.g. the purpose or the audience: “a talk at an academic conference”). The note is passed to the rewrite, the explanation and the chat as an instruction from the user, outside the source-text markers; a regeneration of the session uses the same note. When closed, the toggle shows the beginning of the note, and it starts open when a note is written, so a note never applies unnoticed. The note is kept with the draft (`chrome.storage.session`). Without a note the prompts are unchanged.
     - Shown when kose is invoked with no selection (the text area gets focus), when there are no sessions (with a one-line hint about the other ways to invoke kose), and when “✏️ Free input” is chosen in the header's session list, where it is always the first item.
     - The free-input review is a session with the special tab ID `SCRATCH_TAB_ID = -1` and `source: { tabId: -1, frameId: 0, tabTitle: <“Free input” in the UI language>, textSource: 'script', editable: false }`. It behaves like a tab's session (one at a time; running again replaces it; waiting-time quiz; mistakes are recorded), but no browser tab closes it, so it lasts until the browser exits.
     - The draft is saved in `chrome.storage.session` (never written to disk), like sessions.
@@ -63,8 +64,8 @@ The header shows the **source tab** (page title) of the displayed session and a 
 ```
 ┌─────────────────────────────────────────┐
 │ kose  📄 GitHub - issue #12 ▼  Review 3 │  ← source tab / session list / due quiz
-│ Mode [Make it good English ▼]           │
-│ Situation [Technical discussion ▼] [Apply] │
+│ Mode  Make it good [Japanese|English]   │
+│ Situation [Technical discussion ▼] [kose] │
 ├─────────────────────────────────────────┤
 │ Original                      123 chars │
 │ [selected text]                         │
@@ -91,7 +92,7 @@ The header shows the **source tab** (page title) of the displayed session and a 
 
 ### 1.4 UI language and explanation language
 
-- **UI**: all user-visible strings are in message catalogs (`src/shared/messages.ts`). The Japanese catalog is used when the browser UI language (`chrome.i18n.getUILanguage()`) is Japanese; otherwise the English one. The manifest description and the shortcut description use `_locales/en` and `_locales/ja`. This document names UI elements in English; the Japanese UI uses the corresponding Japanese labels (e.g. “Mode” = 機能, “Situation” = 用途, “Apply” = 変更, “Free input” = 自由入力, “Review N” = 復習 N, “Show explanation” = 解説を見る, “Discuss the nuance” = ニュアンスを相談).
+- **UI**: all user-visible strings are in message catalogs (`src/shared/messages.ts`). The Japanese catalog is used when the browser UI language (`chrome.i18n.getUILanguage()`) is Japanese; otherwise the English one. The manifest description and the shortcut description use `_locales/en` and `_locales/ja`. This document names UI elements in English; the Japanese UI uses the corresponding Japanese labels (e.g. “Mode” = 機能, “Situation” = 用途, “Free input” = 自由入力, “Review N” = 復習 N, “Show explanation” = 解説を見る, “Discuss the nuance” = ニュアンスを相談).
 - **AI output**: explanations, chat replies and therefore the explanations saved with mistakes are written in the browser UI language. The language is passed to the AI as `explanationLanguage` and named in the prompt (“Explanation language: Japanese”). Chrome built-in AI falls back to English for languages it cannot output (§4.1).
 - Language and situation names used in prompts are fixed English names (`domain/labels.ts`), independent of the UI language.
 
@@ -213,6 +214,7 @@ interface RewriteRequest {
   sourceText: string;
   targetLanguage: LanguageCode;
   situation: Situation;
+  note?: string; // the free input's note; also in ExplainRequest, ChatRequest, PendingRequest and ReviewSession
 }
 
 /** Stage 1: the rewrite only */
@@ -350,7 +352,7 @@ interface AIProvider {
 ### 4.3 Sessions and versions
 
 - **A new session starts only on invocation** (right-click, toolbar button, shortcut, or running the free input). One session per tab; invoking again in the same tab replaces it. Conversations of different sessions are never mixed.
-- “Apply” adds a version with `origin: 'regenerate'` to the same session; the chat continues.
+- Regenerating (a language button or the settings bar's “kose”) adds a version with `origin: 'regenerate'` to the same session; the chat continues.
 - A new rewrite from chat is added as a version with `origin: 'chat'` using the settings of the version being discussed, and becomes current. If the reply is only an explanation, the result is not changed.
 - Switching to an earlier version only changes `currentVersionId`; saved learning cards are neither deleted nor regenerated.
 - Requests of different sessions run independently. Switching the displayed session does not cancel other sessions' requests. A new invocation in the same tab cancels that tab's rewrite, explanations and chat. Closing the tab cancels everything for it.

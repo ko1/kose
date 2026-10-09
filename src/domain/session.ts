@@ -38,6 +38,7 @@ export function createSession(req: PendingRequest, situation: Situation): Review
     messages: [],
     targetLanguage: req.targetLanguage,
     situation,
+    ...(req.note ? { note: req.note } : {}),
     status: { kind: 'idle' },
   };
 }
@@ -128,5 +129,6 @@ export function buildChatRequest(
       m.role === 'assistant' ? { role: m.role, content: m.content, revisedText: revisedOf(m.versionId) } : m,
     ),
     message,
+    ...(session.note ? { note: session.note } : {}),
   };
 }

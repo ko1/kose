@@ -19,6 +19,8 @@ export interface RewriteRequest {
   sourceText: string;
   targetLanguage: LanguageCode;
   situation: Situation;
+  /** 自由入力で書いたユーザーの補足（目的・読み手など）。原文と違い、従うべき指示として渡す */
+  note?: string;
 }
 
 export interface Change {
@@ -82,6 +84,8 @@ export interface ExplainRequest {
   reviewStructure: boolean;
   /** 解説を書く言語（ブラウザの言語。"ja" など） */
   explanationLanguage: string;
+  /** 自由入力で書いたユーザーの補足（目的・読み手など）。原文と違い、従うべき指示として渡す */
+  note?: string;
 }
 
 export type VersionOrigin = 'initial' | 'regenerate' | 'chat';
@@ -124,6 +128,8 @@ export interface ChatRequest {
   /** これまでの会話（今回のユーザー発言は含まない）。assistant は返答と、そのとき作った改稿案 */
   history: { role: 'user' | 'assistant'; content: string; revisedText?: string }[];
   message: string;
+  /** 自由入力で書いたユーザーの補足（目的・読み手など）。原文と違い、従うべき指示として渡す */
+  note?: string;
 }
 
 export interface ChatReply {
@@ -154,6 +160,8 @@ export interface PendingRequest {
   text: string;
   source: SourceLocation;
   createdAt: number;
+  /** 自由入力で書いたユーザーの補足（目的・読み手など）。原文と違い、従うべき指示として渡す */
+  note?: string;
 }
 
 export type SessionStatus =
@@ -179,6 +187,8 @@ export interface ReviewSession {
   /** 最後に要求した設定（再生成・再実行で使う） */
   targetLanguage: LanguageCode;
   situation: Situation;
+  /** 自由入力で書いたユーザーの補足（目的・読み手など）。原文と違い、従うべき指示として渡す */
+  note?: string;
   status: SessionStatus;
 }
 

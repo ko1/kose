@@ -246,9 +246,54 @@ del {
   flex-direction: column;
 }
 
-.field label {
+.field label,
+.field .label {
   font-size: 11px;
   color: var(--fg-muted);
+}
+
+/* 「よい [日本語|英語] にする」は一続きの文として読ませる */
+.target-choice {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  font-size: 15px;
+  font-weight: bold;
+}
+
+/* 機能は2択なので、選択肢を一度に見せて1クリックで切り替える */
+.segmented {
+  display: inline-flex;
+}
+
+.segmented button {
+  border-radius: 0;
+  padding: 2px 10px;
+  background: var(--bg);
+  color: var(--fg-muted);
+  font-weight: normal;
+}
+
+.segmented button + button {
+  margin-left: -1px;
+}
+
+.segmented button:first-child {
+  border-radius: var(--radius) 0 0 var(--radius);
+}
+
+.segmented button:last-child {
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+/* 塗りつぶさず、枠と文字だけをアクセント色にして選択を示す */
+.segmented button[aria-pressed='true'] {
+  position: relative;
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg));
+  border-color: var(--accent);
+  color: var(--fg);
+  font-weight: bold;
 }
 
 .provider {
@@ -454,10 +499,25 @@ button.link {
   border-radius: var(--radius);
 }
 
+.scratch textarea.scratch-note {
+  min-height: 3em;
+  margin-top: 4px;
+}
+
 .scratch-actions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
   margin-top: 4px;
+}
+
+/* 閉じていても補足の先頭が見えるようにする。長ければ省略 */
+.note-toggle {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
 }
 
 .badge-repeated {

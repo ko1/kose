@@ -13,9 +13,9 @@ A personal Chrome extension that turns text you select on a web page into good J
 - **Nuance chat** (“Discuss the nuance”): ask about wording or request changes ("make it sound like getting home was hard"). A requested change becomes a new version of the result; plain questions never change it. Each review has its own conversation.
 - **Mistake notes**: when proofreading in the same language (ja→ja, en→en), objective grammar/usage errors from the explanation are saved automatically as short phrase pairs (never the full text or URL). They are recorded only when an explanation is generated (with cloud providers: “Show explanation” or auto-explanation on). When you make a recorded mistake again, the explanation marks it “You made this before (recorded N×)” and the card comes back for review within a day. View, delete, clear and export/import them on the options page.
 - **Review quiz**: while you wait for a rewrite, one due mistake is shown as a multiple-choice quiz: pick the correct one of the two phrases; the result is recorded automatically. The “Review N” button in the window header reviews all due mistakes. Scheduling is a simplified SM-2; a new mistake first comes up the next day.
-- **Free input** (“✏️ Free input”): write text directly in the kose window and run kose on it with Ctrl+Enter — handy for text that is not on a page yet. It opens when you invoke kose with nothing selected
+- **Free input** (“✏️ Free input”): write text directly in the kose window and run kose on it with Ctrl+Enter — handy for text that is not on a page yet. It opens when you invoke kose with nothing selected. “+ Note” adds a note to kose such as the purpose or the audience
 - One review per browser tab; the kose window follows the active tab
-- Change “Mode” (target language) / “Situation” at the top of the window and regenerate with “Apply”; switch between earlier versions
+- Switch the target language at the top of the window (“Make it good [Japanese|English]”) to regenerate at once, or change “Situation” and press “kose”; switch between earlier versions
 - **Languages**: the UI is Japanese when Chrome's UI language is Japanese, and English otherwise. Explanations, chat replies and mistake explanations are written in Chrome's UI language (Chrome built-in AI: Japanese, English or Spanish; other languages fall back to English). The examples below use the English UI labels.
 - AI providers: Chrome built-in AI (default, nothing leaves the browser), Claude (Anthropic API), OpenAI API. Cloud providers use your own API key and are used only when you explicitly select them.
 - Per-request cost is shown for Claude (computed from the token usage returned by the API)
@@ -58,10 +58,10 @@ KOSE_WIN_DIR=/mnt/c/Users/<you>/kose-dist npm run build:win   # custom destinati
 1. Select text, then right-click → “kose: …”, click the kose toolbar button, or press Alt+K (change the key at `chrome://extensions/shortcuts`). The menu item shows the current target, e.g. “kose: Make it good English”.
 2. The kose window opens (or comes to the front) and processing starts immediately
 3. “Copy” copies the rewrite. Writing back into the page is not implemented.
-4. Change “Mode” (Make it good Japanese / good English) / “Situation” at the top and press “Apply” to regenerate from the same original. The button is enabled only when the dropdowns differ from the displayed version. Changing the dropdowns alone does not call the AI. The chosen “Mode” is used for the next invocation.
+4. Press Japanese or English in “Make it good [Japanese|English]” at the top to regenerate from the same original at once. To change “Situation”, choose it and press “kose” next to it (choosing alone does not call the AI). The chosen settings are used for the next invocation.
 5. Ask about the rewrite in “Discuss the nuance”. Enter sends, Shift+Enter inserts a newline (Enter while composing Japanese input does not send).
 6. While the rewrite is being generated, a due mistake may appear under “Review while you wait”. Answer it or ignore it; it folds up when the result arrives. “Review N” in the header reviews all due mistakes.
-7. With no selection (or on pages kose cannot read), the toolbar button and Alt+K open “✏️ Free input” with the cursor in the text area. Type, then Ctrl+Enter (or “kose”). The result appears below; the draft stays until the browser exits. “✏️ Free input” is always the first item in the header's list. Settings: “⚙ Settings” at the bottom (including “Mistake notes and review”).
+7. With no selection (or on pages kose cannot read), the toolbar button and Alt+K open “✏️ Free input” with the cursor in the text area. Type, then Ctrl+Enter (or “kose”). “+ Note” at the bottom left adds a note to kose (e.g. “a talk at an academic conference”). The result appears below; the draft and the note stay until the browser exits. “✏️ Free input” is always the first item in the header's list. Settings: “⚙ Settings” at the bottom (including “Mistake notes and review”).
 
 ### Run from any application (Windows)
 
@@ -167,6 +167,7 @@ Also check that the “Technical discussion” situation keeps identifiers and U
 2. Type text and press Ctrl+Enter → the result is shown below; the draft stays
 3. Switch to a tab with a review and back via the header list → the draft and the result are still there
 4. Close and reopen the kose window → the draft is restored; with no reviews at all, the free input is shown
+5. “+ Note”, write “a talk at an academic conference”, run → the rewrite and explanation follow the note; closing the note shows its beginning on the toggle
 
 ### Other checks
 

@@ -44,7 +44,15 @@ export function App({ controller }: { controller: KoseController }) {
       <SettingsBar
         settings={settings}
         canRegenerate={!!displayed && settingsChanged(displayed, settings)}
-        onChange={(patch) => controller.updateSettings(patch)}
+        showRegenerate={!showingScratch}
+        onChange={async (patch) => {
+          const languageChanged = patch.targetLanguage !== undefined && patch.targetLanguage !== settings.targetLanguage;
+          await controller.updateSettings(patch);
+          // 機能は押した時点で作り直す。用途は選び間違えやすいので kose ボタンを押すまで待つ
+          if (languageChanged && displayed && settingsChanged(displayed, { ...settings, ...patch })) {
+            void controller.regenerate(displayed.source.tabId);
+          }
+        }}
         onRegenerate={() => displayed && controller.regenerate(displayed.source.tabId)}
       />
       <main className="main">
@@ -59,10 +67,12 @@ export function App({ controller }: { controller: KoseController }) {
             {showingScratch && (
               <ScratchView
                 draft={scratch.draft}
+                note={scratch.note}
                 focusSeq={scratch.focusSeq}
                 running={displayed?.status.kind === 'running'}
                 hasOtherSessions={sessions.some((s) => s.source.tabId !== SCRATCH_TAB_ID)}
                 onChange={(draft) => controller.setScratchDraft(draft)}
+                onNoteChange={(note) => controller.setScratchNote(note)}
                 onRun={() => controller.runScratch()}
               />
             )}

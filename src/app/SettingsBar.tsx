@@ -1,34 +1,46 @@
-import { LANGUAGE_CODES, LanguageCode, Situation, SITUATIONS } from '../domain/types';
+import { LANGUAGE_CODES, Situation, SITUATIONS } from '../domain/types';
 import { M } from '../shared/messages';
 import type { Settings } from '../storage/settings';
 
-/** 機能（Make it good Japanese / English）・用途。次回の実行にも使うので、ウィンドウの一番上に置く */
+/**
+ * 機能（Make it good Japanese / English）・用途。次回の実行にも使うので、ウィンドウの一番上に置く。
+ * kose ボタンは表示中の原文を作り直す。自由入力では入力欄の kose ボタンがあるので出さない
+ */
 export function SettingsBar({
   settings,
   canRegenerate,
+  showRegenerate,
   onChange,
   onRegenerate,
 }: {
   settings: Settings;
   canRegenerate: boolean;
+  showRegenerate: boolean;
   onChange: (patch: Partial<Settings>) => void;
   onRegenerate: () => void;
 }) {
   return (
     <div className="settings-bar">
       <div className="field">
-        <label htmlFor="target">{M.settingsBar.target}</label>
-        <select
-          id="target"
-          value={settings.targetLanguage}
-          onChange={(e) => onChange({ targetLanguage: e.target.value as LanguageCode })}
-        >
-          {LANGUAGE_CODES.map((code) => (
-            <option key={code} value={code}>
-              {M.settingsBar.targetOption(M.languages[code].target)}
-            </option>
-          ))}
-        </select>
+        <span className="label" id="target-label">
+          {M.settingsBar.target}
+        </span>
+        <div className="target-choice" role="group" aria-labelledby="target-label">
+          {M.settingsBar.targetPrefix}
+          <span className="segmented">
+            {LANGUAGE_CODES.map((code) => (
+              <button
+                key={code}
+                type="button"
+                aria-pressed={settings.targetLanguage === code}
+                onClick={() => onChange({ targetLanguage: code })}
+              >
+                {M.languages[code].name}
+              </button>
+            ))}
+          </span>
+          {M.settingsBar.targetSuffix}
+        </div>
       </div>
       <div className="field">
         <label htmlFor="situation">{M.settingsBar.situation}</label>
@@ -44,14 +56,11 @@ export function SettingsBar({
           ))}
         </select>
       </div>
-      <button
-        className="primary"
-        disabled={!canRegenerate}
-        onClick={onRegenerate}
-        title={M.settingsBar.applyTitle}
-      >
-        {M.settingsBar.apply}
-      </button>
+      {showRegenerate && (
+        <button className="primary" disabled={!canRegenerate} onClick={onRegenerate} title={M.settingsBar.applyTitle}>
+          {M.settingsBar.apply}
+        </button>
+      )}
     </div>
   );
 }
