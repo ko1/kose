@@ -9,7 +9,7 @@ export function SourceLink({ title, url }: { title: string; url: string }) {
   );
 }
 
-function hostOf(url: string): string {
+export function hostOf(url: string): string {
   try {
     return new URL(url).host;
   } catch {

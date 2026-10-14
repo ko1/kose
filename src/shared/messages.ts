@@ -1,4 +1,4 @@
-import type { LanguageCode, Situation } from '../domain/types';
+import type { LanguageCode, SearchPhase, Situation } from '../domain/types';
 import { uiLanguage } from './locale';
 
 /**
@@ -134,6 +134,12 @@ const en = {
     updated: (n: number) => `↑ Result updated to version ${n}`,
     showVersion: (n: number) => `↑ Show version ${n} as the result`,
     thinking: 'Thinking…',
+    phases: {
+      starting: 'Thinking…',
+      searching: 'Searching the web…',
+      reading: 'Reading the search results…',
+      writing: 'Writing the reply…',
+    } as Record<SearchPhase, string>,
     resend: 'Send again',
     placeholderDisabled: 'You can ask once the rewrite is done',
     placeholder: 'What would you like to discuss? (Enter to send, Shift+Enter for a new line)',
@@ -159,13 +165,24 @@ const en = {
     applyRequest: (list: string) => `Apply the following structure suggestions and create a restructured version.\n\n${list}`,
   },
 
+  search: {
+    searching: 'searching…',
+    found: (count: number, hosts: { shown: string[]; more: boolean }) =>
+      count === 0 ? '→ nothing found' : `→ ${count} results (${hosts.shown.join(', ')}${hosts.more ? ', …' : ''})`,
+  },
+
   factCheck: {
     heading: 'Fact check',
     run: '🔍 Fact check',
     retry: 'Retry the fact check',
     costNote: 'Searches the web to check the facts in the original (about $0.01 per search plus tokens).',
     unsupported: 'Fact checking needs web search. Choose Claude on the settings page to use it.',
-    running: 'Checking the facts…',
+    phases: {
+      starting: 'Finding the claims to check…',
+      searching: 'Searching the web…',
+      reading: 'Reading the search results…',
+      writing: 'Writing up the verdicts…',
+    } as Record<SearchPhase, string>,
     searches: (n: number) => `${n} searches`,
     cancel: 'Cancel',
     verdicts: { accurate: 'Accurate', inaccurate: 'Inaccurate', misleading: 'Misleading', unverified: 'Unverified' },
@@ -453,6 +470,12 @@ const ja: Messages = {
     updated: (n: number) => `↑ 改稿を案 ${n} に更新しました`,
     showVersion: (n: number) => `↑ 案 ${n} を改稿に表示`,
     thinking: '考えています…',
+    phases: {
+      starting: '考えています…',
+      searching: 'Web を検索しています…',
+      reading: '検索結果を読んでいます…',
+      writing: '返答を書いています…',
+    } as Record<SearchPhase, string>,
     resend: '送り直す',
     placeholderDisabled: '改稿が終わると相談できます',
     placeholder: '相談したいこと（Enterで送信、Shift+Enterで改行）',
@@ -478,13 +501,24 @@ const ja: Messages = {
     applyRequest: (list: string) => `次の構成の指摘を反映して、構成を直した案を作ってください。\n\n${list}`,
   },
 
+  search: {
+    searching: '検索中…',
+    found: (count: number, hosts: { shown: string[]; more: boolean }) =>
+      count === 0 ? '→ 見つからず' : `→ ${count} 件（${hosts.shown.join('、')}${hosts.more ? ' ほか' : ''}）`,
+  },
+
   factCheck: {
     heading: '事実確認',
     run: '🔍 事実確認',
     retry: '事実確認をやり直す',
     costNote: '原文の事実を Web 検索で確かめます（検索1回 約$0.01＋トークン代）。',
     unsupported: '事実確認には Web 検索が必要です。使うには設定で Claude を選んでください。',
-    running: '事実を確認しています…',
+    phases: {
+      starting: '文章から確かめる主張を探しています…',
+      searching: 'Web を検索しています…',
+      reading: '検索結果を読んで確かめています…',
+      writing: '判定をまとめています…',
+    } as Record<SearchPhase, string>,
     searches: (n: number) => `検索 ${n} 回`,
     cancel: '中止',
     verdicts: { accurate: '正確', inaccurate: '誤り', misleading: '誤解を招く', unverified: '確認できず' },

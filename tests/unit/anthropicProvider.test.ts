@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { describe, expect, it, vi } from 'vitest';
 import { ANTHROPIC_ORIGIN, AnthropicProvider, supportsEffort } from '../../src/ai/anthropicProvider';
 import { createProvider } from '../../src/ai/factory';
-import type { PartialExplanation } from '../../src/domain/types';
+import type { FactCheckProgress, PartialExplanation, SearchProgress } from '../../src/domain/types';
 import { DEFAULT_SETTINGS } from '../../src/storage/settings';
 import { fakeChrome } from '../fakeChrome';
 
@@ -234,9 +234,22 @@ describe('AnthropicProvider', () => {
       },
     };
     const usage = (searches: number) => ({ input_tokens: 1000, output_tokens: 100, cache_creation_input_tokens: null, cache_read_input_tokens: null, server_tool_use: { web_search_requests: searches, web_fetch_requests: 0 } });
+    const reportJson = JSON.stringify(report.input);
     const responses = [
-      { events: searchEvents(0, '東京タワー 完成年'), final: { stop_reason: 'pause_turn', content: [searchResult], usage: usage(1) } },
-      { events: searchEvents(0, 'Tokyo Tower completed'), final: { stop_reason: 'tool_use', content: [report], usage: usage(1) } },
+      {
+        events: [...searchEvents(0, '東京タワー 完成年'), { type: 'content_block_start', index: 1, content_block: searchResult }],
+        final: { stop_reason: 'pause_turn', content: [searchResult], usage: usage(1) },
+      },
+      {
+        events: [
+          ...searchEvents(0, 'Tokyo Tower completed'),
+          { type: 'content_block_start', index: 1, content_block: { type: 'tool_use', id: 't1', name: 'report_fact_check', input: {} } },
+          { type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: reportJson.slice(0, 90) } },
+          { type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: reportJson.slice(90) } },
+          { type: 'content_block_stop', index: 1 },
+        ],
+        final: { stop_reason: 'tool_use', content: [report], usage: usage(1) },
+      },
     ];
     const stream = vi.fn((_params: Record<string, unknown>, _opts?: unknown) => {
       const r = responses.shift()!;
@@ -248,12 +261,21 @@ describe('AnthropicProvider', () => {
       };
     });
     const client = { beta: { messages: { stream } } } as unknown as Anthropic;
-    const progress: string[][] = [];
+    const progress: FactCheckProgress[] = [];
     const result = await new AnthropicProvider(config, () => client).factCheck(
       { requestId: 'f', sourceText: '東京タワーは1950年完成', explanationLanguage: 'ja', today: '2026-10-14' },
       undefined,
-      (p) => progress.push(p.queries),
+      (p) => progress.push(p),
     );
+    // 段階は 最初 → 検索 → 結果を読む → … → 書き出し と進み、検索語は入力途中から、結果はサイトとともに届く
+    expect(progress[0]).toEqual({ phase: 'starting', searches: [] });
+    expect(progress.map((p) => p.phase)).toEqual(expect.arrayContaining(['searching', 'reading', 'writing']));
+    expect(progress.find((p) => p.phase === 'reading')?.searches).toEqual([
+      { query: '東京タワー 完成年', results: [{ title: 'Tower', url: 'https://example.com/tower' }] },
+    ]);
+    expect(progress.some((p) => p.searches.some((s) => s.query === ''))).toBe(true);
+    const writing = progress.filter((p) => p.phase === 'writing');
+    expect(writing.some((p) => p.partial?.claims?.length === 1 && p.partial.claims[0].verdict !== undefined)).toBe(true);
 
     expect(stream).toHaveBeenCalledTimes(2);
     const params = stream.mock.calls[1][0] as { model: string; tools: { type?: string; name: string; strict?: boolean }[]; messages: { role: string }[]; system: string };
@@ -261,7 +283,6 @@ describe('AnthropicProvider', () => {
     expect(params.tools[0]).toMatchObject({ type: 'web_search_20260209', name: 'web_search' });
     expect(params.tools[1]).toMatchObject({ name: 'report_fact_check', strict: true });
     expect(params.messages.map((m) => m.role)).toEqual(['user', 'assistant']);
-    expect(progress.at(-1)).toEqual(['東京タワー 完成年', 'Tokyo Tower completed']);
     expect(result.queries).toEqual(['東京タワー 完成年', 'Tokyo Tower completed']);
     // 検索結果にない URL は出典から外す
     expect(result.claims[0].sources).toEqual([{ title: 'Tower', url: 'https://example.com/tower' }]);
@@ -313,7 +334,7 @@ describe('AnthropicProvider', () => {
       ],
     });
     const partials: string[] = [];
-    const searches: string[][] = [];
+    const searches: SearchProgress[] = [];
     const r = await new AnthropicProvider(config, () => client).chat(
       {
         requestId: 'c',
@@ -339,7 +360,8 @@ describe('AnthropicProvider', () => {
     const params = stream.mock.calls[0][0] as { tools: { name: string; strict?: boolean }[]; output_config?: { format?: unknown } };
     expect(params.tools.map((t) => t.name)).toEqual(['web_search', 'report_reply']);
     expect(params.output_config?.format).toBeUndefined();
-    expect(searches).toEqual([['東京タワー']]);
+    expect(searches.at(-1)?.searches.map((s) => s.query)).toEqual(['東京タワー']);
+    expect(searches.at(-1)?.phase).toBe('writing');
     expect(partials.at(-1)).toBe('1958年完成です。');
     expect(r.revisedText).toBeUndefined();
     expect(r.sources?.map((s) => s.title)).toEqual(['search', 'fact check']);

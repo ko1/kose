@@ -12,6 +12,7 @@ import type {
   PendingRequest,
   RewriteRequest,
   RewriteResult,
+  SearchProgress,
 } from '../../src/domain/types';
 import { loadMistakes, saveMistakes } from '../../src/storage/mistakeStore';
 import { putPending, requestScratch } from '../../src/storage/sessionStore';
@@ -48,8 +49,8 @@ class FakeProvider implements AIProvider {
       signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
     });
   }
-  chatCalls: { request: ChatRequest; signal?: AbortSignal; onPartial?: (t: string) => void; onSearch?: (q: string[]) => void; resolve: (v: ChatReply) => void; reject: (e: unknown) => void }[] = [];
-  chat(request: ChatRequest, signal?: AbortSignal, onPartial?: (t: string) => void, onSearch?: (q: string[]) => void) {
+  chatCalls: { request: ChatRequest; signal?: AbortSignal; onPartial?: (t: string) => void; onSearch?: (p: SearchProgress) => void; resolve: (v: ChatReply) => void; reject: (e: unknown) => void }[] = [];
+  chat(request: ChatRequest, signal?: AbortSignal, onPartial?: (t: string) => void, onSearch?: (p: SearchProgress) => void) {
     return new Promise<ChatReply>((resolve, reject) => {
       this.chatCalls.push({ request, signal, onPartial, onSearch, resolve, reject });
       signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
@@ -133,8 +134,11 @@ describe('KoseController', () => {
     await flush();
     expect(provider.factCheckCalls[0].request).toMatchObject({ sourceText: '東京タワーは1950年完成' });
     expect(provider.factCheckCalls[0].request.today).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    provider.factCheckCalls[0].onProgress?.({ queries: ['東京タワー 完成年'] });
-    expect(snap().factCheckState).toMatchObject({ kind: 'running', queries: ['東京タワー 完成年'] });
+    provider.factCheckCalls[0].onProgress?.({ phase: 'searching', searches: [{ query: '東京タワー 完成年' }] });
+    expect(snap().factCheckState).toMatchObject({
+      kind: 'running',
+      progress: { phase: 'searching', searches: [{ query: '東京タワー 完成年' }] },
+    });
 
     // 改稿を中止しても事実確認は続く
     controller.cancelRewrite(1);
@@ -163,8 +167,8 @@ describe('KoseController', () => {
     const call = provider.chatCalls[0];
     expect(call.request).toMatchObject({ webSearch: true, factCheck: { summary: '一部に誤りがあります。' } });
     expect(call.request.currentRevisedText).toBeUndefined();
-    call.onSearch?.(['東京タワー 完成']);
-    expect(snap().chatState).toMatchObject({ kind: 'running', queries: ['東京タワー 完成'] });
+    call.onSearch?.({ phase: 'reading', searches: [{ query: '東京タワー 完成', results: [] }] });
+    expect(snap().chatState).toMatchObject({ kind: 'running', search: { phase: 'reading' } });
     call.resolve({ reply: '1958年です', revisedText: '勝手な案', sources: [{ title: 'T', url: 'https://example.com/t' }] });
     await flush();
     // 改稿がないので案は作らない

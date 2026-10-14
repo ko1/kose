@@ -10,6 +10,7 @@ import type {
   PartialExplanation,
   RewriteRequest,
   RewriteResult,
+  SearchProgress,
 } from '../domain/types';
 
 export type ProviderId = 'builtin' | 'anthropic' | 'openai' | 'gemini' | 'openrouter' | 'ollama';
@@ -49,7 +50,7 @@ export interface AIProvider {
   prepare?(targetLanguage: LanguageCode, onProgress: (ratio: number) => void): Promise<void>;
   /**
    * 事実確認（校閲）。Web 検索で原文の主張を確かめる。検索できるプロバイダーだけ実装する。
-   * onProgress: 検索した語句が増えるたびに呼ぶ
+   * onProgress: 段階・検索・書き出し途中の結果が変わるたびに呼ぶ
    */
   factCheck?(
     request: FactCheckRequest,
@@ -58,13 +59,13 @@ export interface AIProvider {
   ): Promise<FactCheckResult>;
   /**
    * 相談。onPartial: 生成途中の返答（対応するプロバイダーのみ呼ぶ）。
-   * onSearch: request.webSearch のとき Web 検索した語句（検索できるプロバイダーのみ呼ぶ）
+   * onSearch: request.webSearch のとき Web 検索の経過（検索できるプロバイダーのみ呼ぶ）
    */
   chat(
     request: ChatRequest,
     signal?: AbortSignal,
     onPartial?: (reply: string) => void,
-    onSearch?: (queries: string[]) => void,
+    onSearch?: (progress: SearchProgress) => void,
   ): Promise<ChatReply>;
 }
 

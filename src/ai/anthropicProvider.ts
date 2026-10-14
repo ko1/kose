@@ -8,12 +8,15 @@ import type {
   FactCheckProgress,
   FactCheckRequest,
   LanguageCode,
+  SearchPhase,
+  SearchProgress,
+  SearchStep,
   PartialExplanation,
   RewriteRequest,
   RewriteResult,
   Usage,
 } from '../domain/types';
-import { distinct, extractPartialExplanation, extractPartialStringField } from './partialJson';
+import { distinct, extractPartialExplanation, extractPartialStringField, parsePartialJson } from './partialJson';
 import { anthropicCostUsd } from './pricing';
 import {
   buildChatSystemPrompt,
@@ -143,7 +146,7 @@ export class AnthropicProvider implements AIProvider {
     request: ChatRequest,
     signal?: AbortSignal,
     onPartial?: (reply: string) => void,
-    onSearch?: (queries: string[]) => void,
+    onSearch?: (progress: SearchProgress) => void,
   ): Promise<ChatReply> {
     const notify = onPartial && distinct(onPartial, (t) => t);
     const onReply =
@@ -162,7 +165,7 @@ export class AnthropicProvider implements AIProvider {
         maxSearches: MAX_CHAT_SEARCHES,
         effort: this.config.effort,
         signal,
-        onQuery: onSearch,
+        onProgress: onSearch,
         onReportJson: onReply,
       });
       // 事実確認で示した出典も、相談の出典として認める
@@ -186,6 +189,10 @@ export class AnthropicProvider implements AIProvider {
     signal?: AbortSignal,
     onProgress?: (progress: FactCheckProgress) => void,
   ): Promise<FactCheckResult> {
+    // 途中経過は、検索の経過と書き出し途中の結果を合わせて知らせる
+    let search: SearchProgress = { phase: 'starting', searches: [] };
+    let partial: FactCheckProgress['partial'];
+    const notify = onProgress && (() => onProgress({ ...search, ...(partial ? { partial } : {}) }));
     // 調べ方と判定には判断力が要るので解説と同じモデルを使い、改稿の設定（速さ優先）より深く考えさせる
     const { input, urls, queries, usage } = await this.searchAndReport({
       model: this.config.explainModel,
@@ -199,7 +206,20 @@ export class AnthropicProvider implements AIProvider {
       maxSearches: MAX_SEARCHES,
       effort: 'medium',
       signal,
-      onQuery: onProgress && ((queries) => onProgress({ queries })),
+      onProgress:
+        notify &&
+        ((p) => {
+          search = p;
+          notify();
+        }),
+      onReportJson:
+        notify &&
+        ((json) => {
+          const parsed = parsePartialJson(json);
+          if (typeof parsed !== 'object' || parsed === null) return;
+          partial = parsed as FactCheckProgress['partial'];
+          notify();
+        }),
     });
     return { ...parseFactCheckOutput(input, request.sourceText, urls), queries, usage };
   }
@@ -207,7 +227,7 @@ export class AnthropicProvider implements AIProvider {
   /**
    * Web 検索（サーバーツール）つきで問い合わせ、結果は strict なクライアントツールの引数で受け取る。
    * 構造化出力は検索結果の引用（citations）と併用できないため、ツールで形を保証する。
-   * onQuery: 検索語が増えるたびに、それまでの全検索語。onReportJson: 生成途中のツール引数（JSON）
+   * onProgress: 段階や検索の経過が変わるたびに。onReportJson: 生成途中のツール引数（JSON）
    */
   private async searchAndReport(opts: {
     model: string;
@@ -217,13 +237,18 @@ export class AnthropicProvider implements AIProvider {
     maxSearches: number;
     effort: AnthropicEffort;
     signal?: AbortSignal;
-    onQuery?: (queries: string[]) => void;
+    onProgress?: (progress: SearchProgress) => void;
     onReportJson?: (json: string) => void;
   }): Promise<{ input: unknown; urls: Set<string>; queries: string[]; usage: Usage }> {
     const { model, tool } = opts;
     const client = this.clientFactory(this.config.apiKey);
     const messages = [...opts.messages];
-    const queries: string[] = [];
+    // 検索ごとの経過。id は server_tool_use のもので、結果（web_search_tool_result）と結びつける
+    const steps: (SearchStep & { id: string })[] = [];
+    let phase: SearchPhase = 'starting';
+    const progress = () =>
+      opts.onProgress?.({ phase, searches: steps.map(({ id: _id, ...step }) => ({ ...step })) });
+    progress();
     const urls = new Set<string>();
     const total = { input: 0, output: 0, cacheWrite: 0, cacheRead: 0, webSearches: 0 };
     try {
@@ -251,17 +276,42 @@ export class AnthropicProvider implements AIProvider {
           { signal: opts.signal },
         );
 
-        // 検索語は入力の JSON が届き終わった時点で分かる。結果のツール引数は届くたびに知らせる
-        const searching = new Map<number, string>();
+        // 検索語（入力の JSON）と結果のツール引数は、届くたびに知らせる
+        const searching = new Map<number, { step: SearchStep; json: string }>();
         const reporting = new Map<number, string>();
         for await (const event of stream) {
           if (event.type === 'content_block_start') {
             const block = event.content_block;
-            if (block.type === 'server_tool_use' && block.name === 'web_search') searching.set(event.index, '');
-            else if (block.type === 'tool_use' && block.name === tool.name) reporting.set(event.index, '');
+            if (block.type === 'server_tool_use' && block.name === 'web_search') {
+              const step = { id: block.id, query: '' };
+              steps.push(step);
+              searching.set(event.index, { step, json: '' });
+              phase = 'searching';
+              progress();
+            } else if (block.type === 'web_search_tool_result') {
+              const step = steps.find((s) => s.id === block.tool_use_id);
+              if (step) {
+                step.results = Array.isArray(block.content)
+                  ? block.content.map((r) => ({ title: r.title, url: r.url }))
+                  : [];
+              }
+              phase = 'reading';
+              progress();
+            } else if (block.type === 'tool_use' && block.name === tool.name) {
+              reporting.set(event.index, '');
+              phase = 'writing';
+              progress();
+            }
           } else if (event.type === 'content_block_delta' && event.delta.type === 'input_json_delta') {
             const search = searching.get(event.index);
-            if (search !== undefined) searching.set(event.index, search + event.delta.partial_json);
+            if (search) {
+              search.json += event.delta.partial_json;
+              const query = extractPartialStringField(search.json, 'query');
+              if (query !== null && query !== search.step.query) {
+                search.step.query = query;
+                progress();
+              }
+            }
             const report = reporting.get(event.index);
             if (report !== undefined) {
               const json = report + event.delta.partial_json;
@@ -269,12 +319,12 @@ export class AnthropicProvider implements AIProvider {
               opts.onReportJson?.(json);
             }
           } else if (event.type === 'content_block_stop') {
-            const json = searching.get(event.index);
+            const search = searching.get(event.index);
             searching.delete(event.index);
-            const query = json === undefined ? null : searchQuery(json);
-            if (query) {
-              queries.push(query);
-              opts.onQuery?.([...queries]);
+            const query = search ? searchQuery(search.json) : null;
+            if (search && query !== null && query !== search.step.query) {
+              search.step.query = query;
+              progress();
             }
           }
         }
@@ -304,6 +354,7 @@ export class AnthropicProvider implements AIProvider {
             webSearches: total.webSearches,
             costUsd: anthropicCostUsd(message.model, total),
           };
+          const queries = steps.map((s) => s.query).filter((q) => q !== '');
           return { input: report.input, urls, queries, usage };
         }
         // サーバー側の検索が上限に達して一時停止した。そのまま送り返すと続きから再開する

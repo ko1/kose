@@ -135,9 +135,28 @@ export interface FactCheckRequest {
   note?: string;
 }
 
-/** 事実確認の途中経過（表示用） */
-export interface FactCheckProgress {
-  queries: string[];
+/** Web 検索1回の経過（表示用）。results は結果が届くまで undefined */
+export interface SearchStep {
+  /** 検索語（入力途中のこともある） */
+  query: string;
+  results?: FactSource[];
+}
+
+/**
+ * Web 検索つきの問い合わせの段階（表示用）。
+ * starting: 最初の検索の前（何を調べるか考えている）、searching: 検索中、
+ * reading: 検索結果を読んで考えている、writing: 結果を書いている
+ */
+export type SearchPhase = 'starting' | 'searching' | 'reading' | 'writing';
+
+export interface SearchProgress {
+  phase: SearchPhase;
+  searches: SearchStep[];
+}
+
+/** 事実確認の途中経過（表示用）。partial: 書き出し途中の結果（出典の検証前） */
+export interface FactCheckProgress extends SearchProgress {
+  partial?: { summary?: string; claims?: Partial<FactClaim>[] };
 }
 
 export type VersionOrigin = 'initial' | 'regenerate' | 'chat';

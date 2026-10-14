@@ -10,6 +10,7 @@ import type {
   Change,
   ChangeType,
   FactCheck,
+  FactCheckProgress,
   MistakeCard,
   PartialExplanation,
   Rating,
@@ -20,6 +21,7 @@ import type {
 import { M } from '../shared/messages';
 import { ChatSection } from './ChatSection';
 import { QuizCard } from './QuizCard';
+import { SearchSteps } from './SearchSteps';
 import { SourceLink } from './SourceLink';
 import type { ChatState, DownloadState, ExplainState, FactCheckState } from './controller';
 
@@ -548,6 +550,29 @@ function ExplanationBody({
 
 const VERDICT_LABELS = M.factCheck.verdicts;
 
+/** 書き出し途中の判定。出典の検証前なので、出典は出さない */
+function PartialFactCheck({ partial }: { partial: NonNullable<FactCheckProgress['partial']> }) {
+  const claims = (partial.claims ?? []).filter((c) => c.claim || c.quote);
+  return (
+    <>
+      {partial.summary && <p className="text">{partial.summary}</p>}
+      {claims.length > 0 && (
+        <ul className="changes claims">
+          {claims.map((c, i) => (
+            <li key={i}>
+              {c.verdict && c.verdict in VERDICT_LABELS && (
+                <span className={`badge fact-${c.verdict}`}>{VERDICT_LABELS[c.verdict]}</span>
+              )}
+              <span className="claim">{c.quote ? `“${c.quote}”` : c.claim}</span>
+              {c.explanation && <p className="claim-explanation">{c.explanation}</p>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
+  );
+}
+
 /** 原文の中で、事実確認した主張の箇所に判定の色を付ける */
 function MarkedOriginal({ text, factCheck }: { text: string; factCheck: FactCheck }) {
   return (
@@ -583,23 +608,19 @@ function FactCheckSection({
   onApply?: (factCheck: FactCheck) => void;
 }) {
   if (state?.kind === 'running') {
+    const { progress } = state;
     return (
       <section className="section fact-check">
         <div className="status status-running" role="status">
           <span>
-            <span className="spinner" aria-hidden /> {M.factCheck.running} <Elapsed since={state.startedAt} />
+            <span className="spinner" aria-hidden /> {M.factCheck.phases[progress.phase]} <Elapsed since={state.startedAt} />
           </span>
           <button className="link" onClick={onCancel}>
             {M.factCheck.cancel}
           </button>
         </div>
-        {state.queries.length > 0 && (
-          <ul className="queries">
-            {state.queries.map((q, i) => (
-              <li key={i}>🔍 {q}</li>
-            ))}
-          </ul>
-        )}
+        <SearchSteps searches={progress.searches} />
+        {progress.partial && <PartialFactCheck partial={progress.partial} />}
       </section>
     );
   }

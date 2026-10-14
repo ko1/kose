@@ -3,6 +3,7 @@ import { formatCost } from '../ai/pricing';
 import type { ReviewSession } from '../domain/types';
 import { M } from '../shared/messages';
 import type { ChatState } from './controller';
+import { SearchSteps } from './SearchSteps';
 import { SourceLink } from './SourceLink';
 
 interface Props {
@@ -77,13 +78,7 @@ export function ChatSection({ session, state, disabled, external, webSearch, onS
         ))}
         {running && (
           <li className="message assistant pending" role="status">
-            {state.queries && state.queries.length > 0 && (
-              <ul className="queries">
-                {state.queries.map((q, i) => (
-                  <li key={i}>🔍 {q}</li>
-                ))}
-              </ul>
-            )}
+            {state.search && <SearchSteps searches={state.search.searches} />}
             {state.partial ? (
               <p className="text">
                 {state.partial}
@@ -91,7 +86,7 @@ export function ChatSection({ session, state, disabled, external, webSearch, onS
               </p>
             ) : (
               <p className="note">
-                <span className="spinner" aria-hidden /> {M.chat.thinking}
+                <span className="spinner" aria-hidden /> {state.search ? M.chat.phases[state.search.phase] : M.chat.thinking}
               </p>
             )}
           </li>

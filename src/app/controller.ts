@@ -13,7 +13,16 @@ import {
   setExplanation,
 } from '../domain/session';
 import { dueCards, extractMistakes } from '../domain/mistakes';
-import type { MistakeCard, PartialExplanation, PendingRequest, Rating, ReviewSession, SessionStatus } from '../domain/types';
+import type {
+  FactCheckProgress,
+  MistakeCard,
+  PartialExplanation,
+  PendingRequest,
+  Rating,
+  ReviewSession,
+  SearchProgress,
+  SessionStatus,
+} from '../domain/types';
 import { needsStructureReview } from '../domain/structure';
 import { countChars, trimSelection } from '../domain/text';
 import { newId } from '../shared/ids';
@@ -47,7 +56,7 @@ export type ProviderFactory = (settings: Settings) => AIProvider;
 
 /** ニュアンス相談の状況。タブ単位でメモリにだけ持つ */
 export type ChatState =
-  | { kind: 'running'; startedAt: number; partial?: string; queries?: string[] }
+  | { kind: 'running'; startedAt: number; partial?: string; search?: SearchProgress }
   | { kind: 'error'; message: string };
 
 /** 解説（2段目）の生成状況。バージョン単位でメモリにだけ持つ */
@@ -57,7 +66,7 @@ export type ExplainState =
 
 /** 事実確認の実行状況。タブ単位でメモリにだけ持つ */
 export type FactCheckState =
-  | { kind: 'running'; startedAt: number; queries: string[] }
+  | { kind: 'running'; startedAt: number; progress: FactCheckProgress }
   | { kind: 'error'; message: string };
 
 export interface ControllerSnapshot {
@@ -380,7 +389,7 @@ export class KoseController {
     const abort = new AbortController();
     this.factCheckAborts.set(tabId, abort);
     const startedAt = Date.now();
-    this.factCheckStates.set(tabId, { kind: 'running', startedAt, queries: [] });
+    this.factCheckStates.set(tabId, { kind: 'running', startedAt, progress: { phase: 'starting', searches: [] } });
     this.emit();
     try {
       const availability = await provider.availability(session.targetLanguage);
@@ -396,9 +405,9 @@ export class KoseController {
           note: session.note,
         },
         abort.signal,
-        ({ queries }) => {
+        (progress) => {
           if (abort.signal.aborted) return;
-          this.factCheckStates.set(tabId, { kind: 'running', startedAt, queries });
+          this.factCheckStates.set(tabId, { kind: 'running', startedAt, progress });
           this.emit();
         },
       );
@@ -585,11 +594,11 @@ export class KoseController {
     this.emit();
     const provider = this.providerFactory(this.settings);
     try {
-      let queries: string[] | undefined;
+      let search: SearchProgress | undefined;
       let partialReply: string | undefined;
       const progress = () => {
         if (abort.signal.aborted) return;
-        this.chatStates.set(tabId, { kind: 'running', startedAt, partial: partialReply, queries });
+        this.chatStates.set(tabId, { kind: 'running', startedAt, partial: partialReply, search });
         this.emit();
       };
       const reply = await provider.chat(
@@ -599,8 +608,8 @@ export class KoseController {
           partialReply = partial;
           progress();
         },
-        (q) => {
-          queries = q;
+        (p) => {
+          search = p;
           progress();
         },
       );
