@@ -3,6 +3,7 @@ import {
   addVersion,
   appendMessage,
   buildChatRequest,
+  canChat,
   createSession,
   displayedTabAfterActivation,
   markInterrupted,
@@ -45,7 +46,9 @@ const DOWNLOAD_POLL_MS = 3000;
 export type ProviderFactory = (settings: Settings) => AIProvider;
 
 /** ニュアンス相談の状況。タブ単位でメモリにだけ持つ */
-export type ChatState = { kind: 'running'; startedAt: number; partial?: string } | { kind: 'error'; message: string };
+export type ChatState =
+  | { kind: 'running'; startedAt: number; partial?: string; queries?: string[] }
+  | { kind: 'error'; message: string };
 
 /** 解説（2段目）の生成状況。バージョン単位でメモリにだけ持つ */
 export type ExplainState =
@@ -475,7 +478,7 @@ export class KoseController {
   async sendChat(tabId: number, text: string): Promise<void> {
     const message = text.trim();
     const session = this.sessions.get(tabId);
-    if (!message || !session?.currentVersionId || session.status.kind === 'running') return;
+    if (!message || !session || !canChat(session) || session.status.kind === 'running') return;
     if (this.chatStates.get(tabId)?.kind === 'running') return;
     this.update(tabId, appendMessage(session, { role: 'user', content: message }));
     await this.runChat(tabId);
@@ -525,7 +528,7 @@ export class KoseController {
       uiLanguage(),
     );
     const current = session.versions.find((v) => v.id === session.currentVersionId);
-    if (!request || !current) return;
+    if (!request) return;
 
     this.abortChat(tabId);
     const abort = new AbortController();
@@ -535,18 +538,33 @@ export class KoseController {
     this.emit();
     const provider = this.providerFactory(this.settings);
     try {
-      const reply = await provider.chat(request, abort.signal, (partial) => {
+      let queries: string[] | undefined;
+      let partialReply: string | undefined;
+      const progress = () => {
         if (abort.signal.aborted) return;
-        this.chatStates.set(tabId, { kind: 'running', startedAt, partial });
+        this.chatStates.set(tabId, { kind: 'running', startedAt, partial: partialReply, queries });
         this.emit();
-      });
+      };
+      const reply = await provider.chat(
+        request,
+        abort.signal,
+        (partial) => {
+          partialReply = partial;
+          progress();
+        },
+        (q) => {
+          queries = q;
+          progress();
+        },
+      );
       const latest = this.sessions.get(tabId);
       // 作り直しなどで改稿が実行中になっていたら、古い前提の返答は反映しない
       if (abort.signal.aborted || latest?.id !== session.id || latest.status.kind === 'running') return;
       this.chatStates.delete(tabId);
 
       let next = latest;
-      if (reply.revisedText !== undefined) {
+      const revised = current && reply.revisedText !== undefined;
+      if (current && reply.revisedText !== undefined) {
         // 新しい改稿案は、相談を始めたときの案の設定で追加する
         next = addVersion(
           next,
@@ -559,11 +577,12 @@ export class KoseController {
       next = appendMessage(next, {
         role: 'assistant',
         content: reply.reply,
-        versionId: reply.revisedText !== undefined ? next.currentVersionId! : undefined,
+        versionId: revised ? next.currentVersionId! : undefined,
         usage: reply.usage,
+        ...(reply.sources ? { sources: reply.sources } : {}),
       });
       this.update(tabId, next);
-      if (reply.revisedText !== undefined && (!provider.sendsExternally || this.settings.autoExplainCloud)) {
+      if (revised && (!provider.sendsExternally || this.settings.autoExplainCloud)) {
         void this.explain(tabId, next.currentVersionId!);
       }
     } catch (e) {

@@ -107,28 +107,37 @@ export function appendMessage(session: ReviewSession, message: ChatMessage): Rev
   return { ...session, messages: [...session.messages, message] };
 }
 
-/** 相談の問い合わせを組み立てる。会話はこのセッションのものだけを使う（他のレビューと混ぜない） */
+/** 相談できるか。改稿の案か、事実確認の結果があれば相談できる */
+export function canChat(session: ReviewSession): boolean {
+  return currentVersion(session) !== undefined || session.factCheck !== undefined;
+}
+
+/**
+ * 相談の問い合わせを組み立てる。会話はこのセッションのものだけを使う（他のレビューと混ぜない）。
+ * 事実確認の結果があれば前提として渡し、事実関係は Web 検索で調べてよいことにする
+ */
 export function buildChatRequest(
   session: ReviewSession,
   message: string,
   requestId: string,
   explanationLanguage: string,
 ): ChatRequest | null {
+  if (!canChat(session)) return null;
   const current = currentVersion(session);
-  if (!current) return null;
   const revisedOf = (versionId?: string) => session.versions.find((v) => v.id === versionId)?.result.revisedText;
   return {
     requestId,
     sourceText: session.sourceText,
-    targetLanguage: current.targetLanguage,
+    targetLanguage: current?.targetLanguage ?? session.targetLanguage,
     explanationLanguage,
-    situation: current.situation,
-    currentRevisedText: current.result.revisedText,
+    situation: current?.situation ?? session.situation,
+    ...(current ? { currentRevisedText: current.result.revisedText } : {}),
     previousRevisedTexts: session.versions.map((v) => v.result.revisedText),
     history: session.messages.map((m) =>
       m.role === 'assistant' ? { role: m.role, content: m.content, revisedText: revisedOf(m.versionId) } : m,
     ),
     message,
     ...(session.note ? { note: session.note } : {}),
+    ...(session.factCheck ? { factCheck: session.factCheck, webSearch: true } : {}),
   };
 }

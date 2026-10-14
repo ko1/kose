@@ -12,7 +12,7 @@ A personal Chrome extension that turns text you select on a web page into good J
 - **Structure review** for long texts (500+ characters or 3+ paragraphs): the explanation adds an outline of each paragraph and points out problems in order, flow, transitions, repetition and paragraph breaks. It only points things out; “Create a version that applies the structure suggestions” sends the issues to the chat to get a restructured version.
 - **Fact check** (“🔍 Fact check”, Claude only): checks the factual claims in the original with web search — handy for verifying a long post before believing or sharing it. Each claim gets a verdict (Inaccurate / Misleading / Accurate / Unverified) with the reason and source links, and is highlighted in the original. Only URLs that the search actually returned are kept as sources, and a verdict without a source becomes “Unverified”. It works on the original, so you can run it while the rewrite runs, or press “Cancel” on the rewrite to fact-check only. “Create a version that fixes these facts” asks the chat for a corrected version. About $0.01 per search plus tokens.
 - **No input limit with cloud providers**: long texts are sent as they are (the cost grows with the length). Chrome built-in AI keeps its own limit.
-- **Nuance chat** (“Discuss the nuance”): ask about wording or request changes ("make it sound like getting home was hard"). A requested change becomes a new version of the result; plain questions never change it. Each review has its own conversation.
+- **Chat** (“Discuss”): ask about wording or request changes ("make it sound like getting home was hard"). A requested change becomes a new version of the result; plain questions never change it. After a fact check you can also dig into it (“Why is this misleading?”, “Look for other sources”): the chat knows the result and, with Claude, may search the web again, showing its sources. It is available after a fact check even without a rewrite. Each review has its own conversation.
 - **Mistake notes**: when proofreading in the same language (ja→ja, en→en), objective grammar/usage errors from the explanation are saved automatically as short phrase pairs (never the full text or URL). They are recorded only when an explanation is generated (with cloud providers: “Show explanation” or auto-explanation on). When you make a recorded mistake again, the explanation marks it “You made this before (recorded N×)” and the card comes back for review within a day. View, delete, clear and export/import them on the options page.
 - **Review quiz**: while you wait for a rewrite, one due mistake is shown as a multiple-choice quiz: pick the correct one of the two phrases; the result is recorded automatically. The “Review N” button in the window header reviews all due mistakes. Scheduling is a simplified SM-2; a new mistake first comes up the next day.
 - **Free input** (“✏️ Free input”): write text directly in the kose window and run kose on it with Ctrl+Enter — handy for text that is not on a page yet. It opens when you invoke kose with nothing selected. “+ Note” adds a note to kose such as the purpose or the audience
@@ -61,7 +61,7 @@ KOSE_WIN_DIR=/mnt/c/Users/<you>/kose-dist npm run build:win   # custom destinati
 2. The kose window opens (or comes to the front) and processing starts immediately
 3. “Copy” copies the rewrite. Writing back into the page is not implemented.
 4. Press Japanese or English in “Make it good [Japanese|English]” at the top to regenerate from the same original at once. To change “Situation”, choose it and press “kose” next to it (choosing alone does not call the AI). The chosen settings are used for the next invocation.
-5. Ask about the rewrite in “Discuss the nuance”. Enter sends, Shift+Enter inserts a newline (Enter while composing Japanese input does not send).
+5. Ask about the rewrite or the fact check in “Discuss”. Enter sends, Shift+Enter inserts a newline (Enter while composing Japanese input does not send).
 6. While the rewrite is being generated, a due mistake may appear under “Review while you wait”. Answer it or ignore it; it folds up when the result arrives. “Review N” in the header reviews all due mistakes.
 7. With no selection (or on pages kose cannot read), the toolbar button and Alt+K open “✏️ Free input” with the cursor in the text area. Type, then Ctrl+Enter (or “kose”). “+ Note” at the bottom left adds a note to kose (e.g. “a talk at an academic conference”). The result appears below; the draft and the note stay until the browser exits. “✏️ Free input” is always the first item in the header's list. Settings: “⚙ Settings” at the bottom (including “Mistake notes and review”).
 
@@ -147,12 +147,13 @@ Also check that the “Technical discussion” situation keeps identifiers and U
 5. Review 2 can be selected from the header dropdown
 6. Close tab1 → review 1 disappears from the list
 
-### Nuance chat
+### Chat
 
 1. After a rewrite, ask 「もっと苦労して帰宅したニュアンスにして」 → a new version (“from chat”) is shown in Result
 2. Ask a question such as 「went と got の違いは？」 → Result does not change
 3. “← Previous” returns to the earlier version
 4. Run kose on new text in the same tab, or use another tab → the earlier conversation is not carried over
+5. With Claude, press “Cancel” on a running rewrite, then “🔍 Fact check” → “Discuss” appears; ask 「なぜ誤り？」 → the reply may list searched queries while running and source links; asking for a rewrite does not create a version
 
 ### Mistake notes and review quiz
 

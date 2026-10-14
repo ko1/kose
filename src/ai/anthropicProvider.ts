@@ -17,6 +17,7 @@ import { distinct, extractPartialExplanation, extractPartialStringField } from '
 import { anthropicCostUsd } from './pricing';
 import {
   buildChatSystemPrompt,
+  CHAT_TOOL_NAME,
   buildExplainPrompt,
   buildRewritePrompt,
   chatHistoryMessages,
@@ -30,11 +31,13 @@ import {
 import { AIProvider, FactCheckResult, ProviderAvailability, ProviderError } from './provider';
 import {
   chatJsonSchema,
+  chatWithSourcesJsonSchema,
   explainJsonSchema,
   factCheckJsonSchema,
   InvalidModelOutputError,
   normalizeUrl,
   parseChatOutput,
+  parseChatWithSourcesOutput,
   parseExplainOutput,
   parseFactCheckOutput,
   parseRewriteOutput,
@@ -59,8 +62,10 @@ const FALLBACK_MODELS = new Set(['claude-opus-5', 'claude-fable-5-1']);
 
 /** 事実確認1回で検索してよい回数の上限（費用の上限にもなる） */
 const MAX_SEARCHES = 15;
+/** 相談1回で検索してよい回数の上限。足りない分を調べ直すだけなので少なめ */
+const MAX_CHAT_SEARCHES = 5;
 /** サーバー側の検索が長引いて pause_turn で返ってきたとき、続きを頼む回数の上限 */
-const MAX_FACT_CHECK_TURNS = 4;
+const MAX_SEARCH_TURNS = 4;
 
 export class AnthropicProvider implements AIProvider {
   readonly id = 'anthropic' as const;
@@ -134,88 +139,147 @@ export class AnthropicProvider implements AIProvider {
     return { ...parseExplainOutput(raw, request.sourceText, request.revisedText, request.reviewStructure), usage };
   }
 
-  async chat(request: ChatRequest, signal?: AbortSignal, onPartial?: (reply: string) => void): Promise<ChatReply> {
+  async chat(
+    request: ChatRequest,
+    signal?: AbortSignal,
+    onPartial?: (reply: string) => void,
+    onSearch?: (queries: string[]) => void,
+  ): Promise<ChatReply> {
     const notify = onPartial && distinct(onPartial, (t) => t);
+    const onReply =
+      notify &&
+      ((text: string) => {
+        const partial = extractPartialStringField(text, 'reply');
+        if (partial !== null) notify(partial);
+      });
     // 相談には判断力が要るので解説と同じモデルを使う
+    if (request.webSearch) {
+      const { input, urls, usage } = await this.searchAndReport({
+        model: this.config.explainModel,
+        system: buildChatSystemPrompt(request),
+        messages: chatHistoryMessages(request),
+        tool: { name: CHAT_TOOL_NAME, description: 'Report your reply to the user. Call this exactly once.', schema: chatWithSourcesJsonSchema() },
+        maxSearches: MAX_CHAT_SEARCHES,
+        effort: this.config.effort,
+        signal,
+        onQuery: onSearch,
+        onReportJson: onReply,
+      });
+      // 事実確認で示した出典も、相談の出典として認める
+      for (const c of request.factCheck?.claims ?? []) for (const s of c.sources) urls.add(normalizeUrl(s.url));
+      return { ...parseChatWithSourcesOutput(input, request.currentRevisedText, urls), usage };
+    }
     const { text: raw, usage } = await this.stream(
       this.config.explainModel,
       buildChatSystemPrompt(request),
       chatHistoryMessages(request),
       chatJsonSchema(),
       signal,
-      notify &&
-        ((text) => {
-          const partial = extractPartialStringField(text, 'reply');
-          if (partial !== null) notify(partial);
-        }),
+      onReply,
     );
     return { ...parseChatOutput(raw, request.currentRevisedText), usage };
   }
 
-  /**
-   * 事実確認: Web 検索（サーバーツール）で調べさせ、結果は report_fact_check ツールの引数で受け取る。
-   * 構造化出力は検索結果の引用（citations）と併用できないため、strict なツールで形を保証する。
-   */
+  /** 事実確認: Web 検索で調べさせ、結果は report_fact_check ツールの引数で受け取る */
   async factCheck(
     request: FactCheckRequest,
     signal?: AbortSignal,
     onProgress?: (progress: FactCheckProgress) => void,
   ): Promise<FactCheckResult> {
-    // 調べ方と判定には判断力が要るので解説と同じモデルを使う
-    const model = this.config.explainModel;
+    // 調べ方と判定には判断力が要るので解説と同じモデルを使い、改稿の設定（速さ優先）より深く考えさせる
+    const { input, urls, queries, usage } = await this.searchAndReport({
+      model: this.config.explainModel,
+      system: FACT_CHECK_SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: buildFactCheckPrompt(request) }],
+      tool: {
+        name: FACT_CHECK_TOOL_NAME,
+        description: 'Report the fact-check result. Call this exactly once, after searching.',
+        schema: factCheckJsonSchema(),
+      },
+      maxSearches: MAX_SEARCHES,
+      effort: 'medium',
+      signal,
+      onQuery: onProgress && ((queries) => onProgress({ queries })),
+    });
+    return { ...parseFactCheckOutput(input, request.sourceText, urls), queries, usage };
+  }
+
+  /**
+   * Web 検索（サーバーツール）つきで問い合わせ、結果は strict なクライアントツールの引数で受け取る。
+   * 構造化出力は検索結果の引用（citations）と併用できないため、ツールで形を保証する。
+   * onQuery: 検索語が増えるたびに、それまでの全検索語。onReportJson: 生成途中のツール引数（JSON）
+   */
+  private async searchAndReport(opts: {
+    model: string;
+    system: string;
+    messages: Anthropic.Beta.BetaMessageParam[];
+    tool: { name: string; description: string; schema: Record<string, unknown> };
+    maxSearches: number;
+    effort: AnthropicEffort;
+    signal?: AbortSignal;
+    onQuery?: (queries: string[]) => void;
+    onReportJson?: (json: string) => void;
+  }): Promise<{ input: unknown; urls: Set<string>; queries: string[]; usage: Usage }> {
+    const { model, tool } = opts;
     const client = this.clientFactory(this.config.apiKey);
-    const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: 'user', content: buildFactCheckPrompt(request) }];
+    const messages = [...opts.messages];
     const queries: string[] = [];
     const urls = new Set<string>();
     const total = { input: 0, output: 0, cacheWrite: 0, cacheRead: 0, webSearches: 0 };
-    let servedModel = model;
     try {
-      for (let turn = 0; turn < MAX_FACT_CHECK_TURNS; turn++) {
+      for (let turn = 0; turn < MAX_SEARCH_TURNS; turn++) {
         const stream = client.beta.messages.stream(
           {
             model,
             max_tokens: 64000,
-            system: FACT_CHECK_SYSTEM_PROMPT,
+            system: opts.system,
             messages,
             tools: [
-              { type: webSearchToolType(model), name: 'web_search', max_uses: MAX_SEARCHES },
+              { type: webSearchToolType(model), name: 'web_search', max_uses: opts.maxSearches },
               {
-                name: FACT_CHECK_TOOL_NAME,
-                description: 'Report the fact-check result. Call this exactly once, after searching.',
-                input_schema: factCheckJsonSchema() as Anthropic.Beta.BetaTool.InputSchema,
+                name: tool.name,
+                description: tool.description,
+                input_schema: tool.schema as Anthropic.Beta.BetaTool.InputSchema,
                 strict: true,
               },
             ],
-            // 判定の質を優先して、改稿の設定（速さ優先）より深く考えさせる
-            ...(supportsEffort(model) ? { output_config: { effort: 'medium' as const } } : {}),
+            ...(supportsEffort(model) ? { output_config: { effort: opts.effort } } : {}),
             ...(FALLBACK_MODELS.has(model)
               ? { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' as const }
               : {}),
           },
-          { signal },
+          { signal: opts.signal },
         );
 
-        // 検索語は入力の JSON が届き終わった時点で分かるので、それを途中経過として見せる
+        // 検索語は入力の JSON が届き終わった時点で分かる。結果のツール引数は届くたびに知らせる
         const searching = new Map<number, string>();
+        const reporting = new Map<number, string>();
         for await (const event of stream) {
-          if (event.type === 'content_block_start' && event.content_block.type === 'server_tool_use') {
-            if (event.content_block.name === 'web_search') searching.set(event.index, '');
+          if (event.type === 'content_block_start') {
+            const block = event.content_block;
+            if (block.type === 'server_tool_use' && block.name === 'web_search') searching.set(event.index, '');
+            else if (block.type === 'tool_use' && block.name === tool.name) reporting.set(event.index, '');
           } else if (event.type === 'content_block_delta' && event.delta.type === 'input_json_delta') {
-            const partial = searching.get(event.index);
-            if (partial !== undefined) searching.set(event.index, partial + event.delta.partial_json);
+            const search = searching.get(event.index);
+            if (search !== undefined) searching.set(event.index, search + event.delta.partial_json);
+            const report = reporting.get(event.index);
+            if (report !== undefined) {
+              const json = report + event.delta.partial_json;
+              reporting.set(event.index, json);
+              opts.onReportJson?.(json);
+            }
           } else if (event.type === 'content_block_stop') {
             const json = searching.get(event.index);
             searching.delete(event.index);
             const query = json === undefined ? null : searchQuery(json);
             if (query) {
               queries.push(query);
-              onProgress?.({ queries: [...queries] });
+              opts.onQuery?.([...queries]);
             }
           }
         }
 
         const message = await stream.finalMessage();
-        servedModel = message.model;
         total.input += message.usage.input_tokens;
         total.output += message.usage.output_tokens;
         total.cacheWrite += message.usage.cache_creation_input_tokens ?? 0;
@@ -230,26 +294,25 @@ export class AnthropicProvider implements AIProvider {
         if (message.stop_reason === 'refusal') throw new ProviderError(M.errors.claudeRefused);
         if (message.stop_reason === 'max_tokens') throw new ProviderError(M.errors.claudeMaxTokens);
         const report = message.content.find(
-          (b): b is Anthropic.Beta.BetaToolUseBlock => b.type === 'tool_use' && b.name === FACT_CHECK_TOOL_NAME,
+          (b): b is Anthropic.Beta.BetaToolUseBlock => b.type === 'tool_use' && b.name === tool.name,
         );
         if (report) {
-          return {
-            ...parseFactCheckOutput(report.input, request.sourceText, urls),
-            queries,
-            usage: {
-              model: servedModel,
-              inputTokens: total.input,
-              outputTokens: total.output,
-              webSearches: total.webSearches,
-              costUsd: anthropicCostUsd(servedModel, total),
-            },
+          const usage: Usage = {
+            model: message.model,
+            inputTokens: total.input,
+            outputTokens: total.output,
+            webSearches: total.webSearches,
+            costUsd: anthropicCostUsd(message.model, total),
           };
+          return { input: report.input, urls, queries, usage };
         }
         // サーバー側の検索が上限に達して一時停止した。そのまま送り返すと続きから再開する
         if (message.stop_reason !== 'pause_turn') break;
         messages.push({ role: 'assistant', content: message.content });
       }
-      throw new InvalidModelOutputError(M.errors.noFactCheck);
+      throw new InvalidModelOutputError(
+        tool.name === FACT_CHECK_TOOL_NAME ? M.errors.noFactCheck : M.errors.noReply,
+      );
     } catch (e) {
       throw describeError(e);
     }

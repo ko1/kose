@@ -48,10 +48,10 @@ class FakeProvider implements AIProvider {
       signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
     });
   }
-  chatCalls: { request: ChatRequest; signal?: AbortSignal; onPartial?: (t: string) => void; resolve: (v: ChatReply) => void; reject: (e: unknown) => void }[] = [];
-  chat(request: ChatRequest, signal?: AbortSignal, onPartial?: (t: string) => void) {
+  chatCalls: { request: ChatRequest; signal?: AbortSignal; onPartial?: (t: string) => void; onSearch?: (q: string[]) => void; resolve: (v: ChatReply) => void; reject: (e: unknown) => void }[] = [];
+  chat(request: ChatRequest, signal?: AbortSignal, onPartial?: (t: string) => void, onSearch?: (q: string[]) => void) {
     return new Promise<ChatReply>((resolve, reject) => {
-      this.chatCalls.push({ request, signal, onPartial, resolve, reject });
+      this.chatCalls.push({ request, signal, onPartial, onSearch, resolve, reject });
       signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
     });
   }
@@ -145,6 +145,31 @@ describe('KoseController', () => {
     expect(snap().factCheckState).toBeNull();
     expect(snap().displayed?.factCheck).toMatchObject({ summary: '一部に誤りがあります。', provider: 'builtin' });
     expect(snap().displayed?.status.kind).toBe('cancelled');
+  });
+
+  it('改稿を中止して事実確認だけした場合も相談でき、結果を前提に Web 検索つきで問い合わせる', async () => {
+    const provider = new FactCheckingProvider();
+    const { snap, controller } = await setup({ provider });
+    await putPending(pending(1, '東京タワーは1950年完成'));
+    await flush();
+    controller.cancelRewrite(1);
+    void controller.factCheck(1);
+    await flush();
+    provider.factCheckCalls[0].resolve(factResult);
+    await flush();
+
+    void controller.sendChat(1, 'なぜ誤り？');
+    await flush();
+    const call = provider.chatCalls[0];
+    expect(call.request).toMatchObject({ webSearch: true, factCheck: { summary: '一部に誤りがあります。' } });
+    expect(call.request.currentRevisedText).toBeUndefined();
+    call.onSearch?.(['東京タワー 完成']);
+    expect(snap().chatState).toMatchObject({ kind: 'running', queries: ['東京タワー 完成'] });
+    call.resolve({ reply: '1958年です', revisedText: '勝手な案', sources: [{ title: 'T', url: 'https://example.com/t' }] });
+    await flush();
+    // 改稿がないので案は作らない
+    expect(snap().displayed?.versions).toHaveLength(0);
+    expect(snap().displayed?.messages.at(-1)).toMatchObject({ role: 'assistant', content: '1958年です', sources: [{ title: 'T' }] });
   });
 
   it('事実確認を中止すると結果を捨てる。検索できないプロバイダーでは実行しない', async () => {

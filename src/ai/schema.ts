@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { M } from '../shared/messages';
-import { VERDICTS, type ChatReply, type Explanation, type FactClaim, type RewriteResult } from '../domain/types';
+import { VERDICTS, type ChatReply, type Explanation, type FactClaim, type FactSource, type RewriteResult } from '../domain/types';
 
 // モデルに返させるJSONの形。OpenAI Structured Outputs の strict モード、
 // Anthropic の output_config.format、Prompt API の responseConstraint に同じ JSON Schema を渡す。
@@ -34,12 +34,19 @@ export const explainWithStructureOutputSchema = explainOutputSchema.extend({
 });
 
 /**
- * ニュアンス相談: 返答と、新しい改稿案（作らないときは空文字）。
+ * 相談: 返答と、新しい改稿案（作らないときは空文字）。
  * null を使うと各APIの構造化出力で扱いが分かれるので、空文字で「なし」を表す。
  */
 export const chatOutputSchema = z.strictObject({
   reply: z.string(),
   revisedText: z.string(),
+});
+
+const sourceSchema = z.strictObject({ title: z.string(), url: z.string() });
+
+/** Web 検索つきの相談: 返答に、頼った出典を添える（Anthropic のツールの引数で受け取る） */
+export const chatWithSourcesOutputSchema = chatOutputSchema.extend({
+  sources: z.array(sourceSchema),
 });
 
 /** 事実確認（校閲）: 原文の主張ごとの判定と根拠 */
@@ -51,7 +58,7 @@ export const factCheckOutputSchema = z.strictObject({
       claim: z.string(),
       verdict: z.enum(VERDICTS),
       explanation: z.string(),
-      sources: z.array(z.strictObject({ title: z.string(), url: z.string() })),
+      sources: z.array(sourceSchema),
     }),
   ),
 });
@@ -65,6 +72,7 @@ export const rewriteJsonSchema = (): Record<string, unknown> => toJsonSchema(rew
 export const explainJsonSchema = (withStructure = false): Record<string, unknown> =>
   toJsonSchema(withStructure ? explainWithStructureOutputSchema : explainOutputSchema);
 export const chatJsonSchema = (): Record<string, unknown> => toJsonSchema(chatOutputSchema);
+export const chatWithSourcesJsonSchema = (): Record<string, unknown> => toJsonSchema(chatWithSourcesOutputSchema);
 export const factCheckJsonSchema = (): Record<string, unknown> => toJsonSchema(factCheckOutputSchema);
 
 export class InvalidModelOutputError extends Error {
@@ -124,16 +132,41 @@ function stripCodeFence(raw: string): string {
   return m ? m[1] : raw;
 }
 
-/** 相談の出力を検証する。改稿案が空、または表示中の案と同じなら「改稿なし」とする */
-export function parseChatOutput(raw: string, currentRevisedText: string): ChatReply {
-  const out = parseJson(raw, chatOutputSchema);
+/**
+ * 相談の出力を検証する。改稿案が空、または表示中の案と同じなら「改稿なし」とする。
+ * 改稿がない（事実確認だけした）ときは案を作らない
+ */
+export function parseChatOutput(raw: string, currentRevisedText: string | undefined): ChatReply {
+  return checkChatReply(parseJson(raw, chatOutputSchema), currentRevisedText);
+}
+
+/**
+ * Web 検索つきの相談の出力（ツールの引数）を検証する。出典は検索や事実確認で実際に見つかった
+ * URL（allowedUrls、normalizeUrl 済み）だけを残す
+ */
+export function parseChatWithSourcesOutput(
+  input: unknown,
+  currentRevisedText: string | undefined,
+  allowedUrls: ReadonlySet<string>,
+): ChatReply {
+  const parsed = chatWithSourcesOutputSchema.safeParse(input);
+  if (!parsed.success) throw new InvalidModelOutputError(M.errors.invalidShape);
+  const reply = checkChatReply(parsed.data, currentRevisedText);
+  const sources = keepFoundSources(parsed.data.sources, allowedUrls);
+  return sources.length > 0 ? { ...reply, sources } : reply;
+}
+
+function checkChatReply(out: { reply: string; revisedText: string }, currentRevisedText: string | undefined): ChatReply {
   if (out.reply.trim() === '') {
     throw new InvalidModelOutputError(M.errors.noReply);
   }
   const revised = out.revisedText.trim();
   return {
     reply: out.reply,
-    revisedText: revised === '' || revised === currentRevisedText.trim() ? undefined : out.revisedText,
+    revisedText:
+      currentRevisedText === undefined || revised === '' || revised === currentRevisedText.trim()
+        ? undefined
+        : out.revisedText,
   };
 }
 
@@ -152,10 +185,7 @@ export function parseFactCheckOutput(
   const claims = parsed.data.claims
     .filter((c) => c.claim.trim() !== '')
     .map((c): FactClaim => {
-      const sources = distinctBy(
-        c.sources.filter((s) => searchedUrls.has(normalizeUrl(s.url))),
-        (s) => normalizeUrl(s.url),
-      );
+      const sources = keepFoundSources(c.sources, searchedUrls);
       const quote = c.quote.trim();
       return {
         ...c,
@@ -165,6 +195,14 @@ export function parseFactCheckOutput(
       };
     });
   return { summary: parsed.data.summary, claims };
+}
+
+/** 実際に見つかった URL の出典だけを、重複を除いて残す */
+function keepFoundSources(sources: FactSource[], foundUrls: ReadonlySet<string>): FactSource[] {
+  return distinctBy(
+    sources.filter((s) => foundUrls.has(normalizeUrl(s.url))),
+    (s) => normalizeUrl(s.url),
+  );
 }
 
 /** 検索結果と AI の引用で表記が揺れても同じ URL とみなす（末尾の / と #以降を無視） */

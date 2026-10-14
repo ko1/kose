@@ -3,6 +3,7 @@ import { formatCost } from '../ai/pricing';
 import type { ReviewSession } from '../domain/types';
 import { M } from '../shared/messages';
 import type { ChatState } from './controller';
+import { SourceLink } from './SourceLink';
 
 interface Props {
   session: ReviewSession;
@@ -11,13 +12,15 @@ interface Props {
   disabled: boolean;
   /** クラウドへ送信するプロバイダーか */
   external: boolean;
+  /** 事実関係を Web 検索で調べることがあるか（事実確認の結果があり、検索できるプロバイダー） */
+  webSearch: boolean;
   onSend: (text: string) => void;
   onRetry: () => void;
   onSelectVersion: (versionId: string) => void;
 }
 
-/** ニュアンス相談。会話はこのレビュー（セッション）だけのもの */
-export function ChatSection({ session, state, disabled, external, onSend, onRetry, onSelectVersion }: Props) {
+/** 相談（ニュアンス・事実確認の深掘り）。会話はこのレビュー（セッション）だけのもの */
+export function ChatSection({ session, state, disabled, external, webSearch, onSend, onRetry, onSelectVersion }: Props) {
   const [draft, setDraft] = useState('');
   const running = state?.kind === 'running';
   const canSend = !disabled && !running && draft.trim() !== '';
@@ -42,12 +45,21 @@ export function ChatSection({ session, state, disabled, external, onSend, onRetr
     <section className="section chat">
       <h2>{M.chat.heading}</h2>
       {session.messages.length === 0 && !running && (
-        <p className="note">{M.chat.examples}</p>
+        <p className="note">{session.factCheck ? M.chat.examplesWithFacts : M.chat.examples}</p>
       )}
       <ul className="messages">
         {session.messages.map((m, i) => (
           <li key={i} className={`message ${m.role}`}>
             <p className="text">{m.content}</p>
+            {m.sources && m.sources.length > 0 && (
+              <ul className="sources">
+                {m.sources.map((s, j) => (
+                  <li key={j}>
+                    <SourceLink title={s.title} url={s.url} />
+                  </li>
+                ))}
+              </ul>
+            )}
             {m.role === 'assistant' && (m.versionId || formatCost(m.usage)) && (
               <p className="message-meta">
                 {m.versionId &&
@@ -65,6 +77,13 @@ export function ChatSection({ session, state, disabled, external, onSend, onRetr
         ))}
         {running && (
           <li className="message assistant pending" role="status">
+            {state.queries && state.queries.length > 0 && (
+              <ul className="queries">
+                {state.queries.map((q, i) => (
+                  <li key={i}>🔍 {q}</li>
+                ))}
+              </ul>
+            )}
             {state.partial ? (
               <p className="text">
                 {state.partial}
@@ -98,6 +117,7 @@ export function ChatSection({ session, state, disabled, external, onSend, onRetr
         </button>
       </div>
       {external && <p className="note">{M.chat.externalNote}</p>}
+      {webSearch && <p className="note">{M.chat.searchNote}</p>}
     </section>
   );
 }

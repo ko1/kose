@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeUrl, parseFactCheckOutput } from '../../src/ai/schema';
+import { buildChatSystemPrompt } from '../../src/ai/prompts';
+import { normalizeUrl, parseChatOutput, parseChatWithSourcesOutput, parseFactCheckOutput } from '../../src/ai/schema';
 import { factCheckApplyMessage, markClaims } from '../../src/domain/factCheck';
 import type { FactClaim } from '../../src/domain/types';
 
@@ -76,5 +77,48 @@ describe('factCheckApplyMessage', () => {
     expect(msg).toContain('https://example.com/a');
     expect(msg).toContain('2. 世界一高い');
     expect(msg).not.toContain('333m');
+  });
+});
+
+describe('相談と事実確認', () => {
+  const factCheck = {
+    summary: '一部に誤り',
+    claims: [claim({ quote: '1950年', claim: '1950年完成', verdict: 'inaccurate' as const, explanation: '1958年', sources: [{ title: 'T', url: 'https://example.com/t' }] })],
+    queries: ['東京タワー 完成年'],
+    createdAt: 0,
+  };
+  const chatRequest = {
+    requestId: 'c',
+    sourceText: source,
+    targetLanguage: 'ja' as const,
+    explanationLanguage: 'ja',
+    situation: 'casual' as const,
+    previousRevisedTexts: [],
+    history: [],
+    message: 'なぜ誤り？',
+  };
+
+  it('改稿がなく事実確認だけのときは、結果を前提に渡し、案を作らせず、検索の規則を加える', () => {
+    const prompt = buildChatSystemPrompt({ ...chatRequest, factCheck, webSearch: true });
+    expect(prompt).toContain('[inaccurate] "1950年"');
+    expect(prompt).toContain('https://example.com/t');
+    expect(prompt).toContain('There is no rewrite yet');
+    expect(prompt).toContain('web_search');
+    expect(prompt).not.toContain('CURRENT_REWRITE');
+    const plain = buildChatSystemPrompt({ ...chatRequest, currentRevisedText: 'x', previousRevisedTexts: ['x'] });
+    expect(plain).toContain('CURRENT_REWRITE');
+    expect(plain).not.toContain('FACT_CHECK');
+    expect(plain).not.toContain('web_search');
+  });
+
+  it('改稿がなければ返答の案は捨て、出典は見つかった URL だけを残す', () => {
+    expect(parseChatOutput(JSON.stringify({ reply: 'r', revisedText: 'new' }), undefined).revisedText).toBeUndefined();
+    const r = parseChatWithSourcesOutput(
+      { reply: 'r', revisedText: 'new', sources: [{ title: 'ok', url: 'https://example.com/t/' }, { title: 'ng', url: 'https://made.up/' }] },
+      'old',
+      new Set([normalizeUrl('https://example.com/t')]),
+    );
+    expect(r).toMatchObject({ reply: 'r', revisedText: 'new', sources: [{ title: 'ok' }] });
+    expect(r.sources).toHaveLength(1);
   });
 });

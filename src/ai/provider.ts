@@ -56,8 +56,16 @@ export interface AIProvider {
     signal?: AbortSignal,
     onProgress?: (progress: FactCheckProgress) => void,
   ): Promise<FactCheckResult>;
-  /** ニュアンス相談。onPartial: 生成途中の返答（対応するプロバイダーのみ呼ぶ） */
-  chat(request: ChatRequest, signal?: AbortSignal, onPartial?: (reply: string) => void): Promise<ChatReply>;
+  /**
+   * 相談。onPartial: 生成途中の返答（対応するプロバイダーのみ呼ぶ）。
+   * onSearch: request.webSearch のとき Web 検索した語句（検索できるプロバイダーのみ呼ぶ）
+   */
+  chat(
+    request: ChatRequest,
+    signal?: AbortSignal,
+    onPartial?: (reply: string) => void,
+    onSearch?: (queries: string[]) => void,
+  ): Promise<ChatReply>;
 }
 
 /** プロバイダーが返す事実確認の結果（実行時刻などはコントローラーが付ける） */

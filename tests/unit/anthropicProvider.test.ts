@@ -285,6 +285,66 @@ describe('AnthropicProvider', () => {
     expect(params.output_config).toBeUndefined();
   });
 
+  it('事実確認の後の相談は Web 検索つきで、返答を生成しながら通知し、出典を検証する', async () => {
+    const input = {
+      reply: '1958年完成です。',
+      revisedText: '',
+      sources: [
+        { title: 'search', url: 'https://example.com/s' },
+        { title: 'fact check', url: 'https://example.com/t' },
+        { title: 'made up', url: 'https://made.up/' },
+      ],
+    };
+    const json = JSON.stringify(input);
+    const events: Event[] = [
+      { type: 'content_block_start', index: 0, content_block: { type: 'server_tool_use', id: 's0', name: 'web_search', input: {} } },
+      { type: 'content_block_delta', index: 0, delta: { type: 'input_json_delta', partial_json: '{"query":"東京タワー"}' } },
+      { type: 'content_block_stop', index: 0 },
+      { type: 'content_block_start', index: 2, content_block: { type: 'tool_use', id: 't', name: 'report_reply', input: {} } },
+      { type: 'content_block_delta', index: 2, delta: { type: 'input_json_delta', partial_json: json.slice(0, 20) } },
+      { type: 'content_block_delta', index: 2, delta: { type: 'input_json_delta', partial_json: json.slice(20) } },
+      { type: 'content_block_stop', index: 2 },
+    ];
+    const { client, stream } = fakeClient(events, {
+      stop_reason: 'tool_use',
+      content: [
+        { type: 'web_search_tool_result', tool_use_id: 's0', content: [{ type: 'web_search_result', url: 'https://example.com/s', title: 's' }] },
+        { type: 'tool_use', id: 't', name: 'report_reply', input },
+      ],
+    });
+    const partials: string[] = [];
+    const searches: string[][] = [];
+    const r = await new AnthropicProvider(config, () => client).chat(
+      {
+        requestId: 'c',
+        sourceText: '東京タワーは1950年完成',
+        targetLanguage: 'ja',
+        situation: 'casual',
+        explanationLanguage: 'ja',
+        previousRevisedTexts: [],
+        history: [],
+        message: 'なぜ誤り？',
+        webSearch: true,
+        factCheck: {
+          summary: 's',
+          claims: [{ quote: '1950年', claim: 'c', verdict: 'inaccurate', explanation: 'e', sources: [{ title: 't', url: 'https://example.com/t' }] }],
+          queries: [],
+          createdAt: 0,
+        },
+      },
+      undefined,
+      (p) => partials.push(p),
+      (q) => searches.push(q),
+    );
+    const params = stream.mock.calls[0][0] as { tools: { name: string; strict?: boolean }[]; output_config?: { format?: unknown } };
+    expect(params.tools.map((t) => t.name)).toEqual(['web_search', 'report_reply']);
+    expect(params.output_config?.format).toBeUndefined();
+    expect(searches).toEqual([['東京タワー']]);
+    expect(partials.at(-1)).toBe('1958年完成です。');
+    expect(r.revisedText).toBeUndefined();
+    expect(r.sources?.map((s) => s.title)).toEqual(['search', 'fact check']);
+  });
+
   it('入力の文字数に上限を設けない', () => {
     expect('checkInput' in new AnthropicProvider(config)).toBe(false);
   });

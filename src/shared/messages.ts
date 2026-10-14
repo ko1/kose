@@ -122,9 +122,12 @@ const en = {
   },
 
   chat: {
-    heading: 'Discuss the nuance',
+    heading: 'Discuss',
     examples:
       'e.g. “Make it sound like getting home was hard”, “What is the difference between … and …?”. Asking for a change creates a new version.',
+    examplesWithFacts:
+      'e.g. “Why is this misleading?”, “Is that source reliable?”, “Look for other sources”, or questions about the wording.',
+    searchNote: 'For questions about facts, the AI may search the web (about $0.01 per search).',
     updated: (n: number) => `↑ Result updated to version ${n}`,
     showVersion: (n: number) => `↑ Show version ${n} as the result`,
     thinking: 'Thinking…',
@@ -432,8 +435,10 @@ const ja: Messages = {
   },
 
   chat: {
-    heading: 'ニュアンスを相談',
+    heading: '相談',
     examples: '例:「もっと苦労して帰宅したニュアンスにしたい」「〜と〜の違いは？」。書き換えを頼むと新しい案が作られます。',
+    examplesWithFacts: '例:「なぜ誤解を招くなの？」「その出典は信頼できる？」「他の資料も探して」。言い回しの相談もできます。',
+    searchNote: '事実関係の質問には、AI が Web 検索で調べることがあります（検索1回 約$0.01）。',
     updated: (n: number) => `↑ 改稿を案 ${n} に更新しました`,
     showVersion: (n: number) => `↑ 案 ${n} を改稿に表示`,
     thinking: '考えています…',

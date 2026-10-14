@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { formatCost } from '../ai/pricing';
 import { diffTexts } from '../domain/diff';
-import { currentVersion } from '../domain/session';
+import { canChat, currentVersion } from '../domain/session';
 import { countChars } from '../domain/text';
 import { structureApplyMessage } from '../domain/structure';
 import { knownMistake } from '../domain/mistakes';
@@ -20,6 +20,7 @@ import type {
 import { M } from '../shared/messages';
 import { ChatSection } from './ChatSection';
 import { QuizCard } from './QuizCard';
+import { SourceLink } from './SourceLink';
 import type { ChatState, DownloadState, ExplainState, FactCheckState } from './controller';
 
 interface Props {
@@ -147,16 +148,21 @@ export function ReviewView({
                 : (issues) => onSendChat(structureApplyMessage(issues))
             }
           />
-          <ChatSection
-            session={session}
-            state={chatState}
-            disabled={session.status.kind === 'running'}
-            external={external}
-            onSend={onSendChat}
-            onRetry={onRetryChat}
-            onSelectVersion={onSelectVersion}
-          />
         </>
+      )}
+
+      {/* 改稿の案がなくても、事実確認の結果があればその深掘りを相談できる */}
+      {canChat(session) && !streaming && (
+        <ChatSection
+          session={session}
+          state={chatState}
+          disabled={session.status.kind === 'running'}
+          external={external}
+          webSearch={session.factCheck !== undefined && canFactCheck}
+          onSend={onSendChat}
+          onRetry={onRetryChat}
+          onSelectVersion={onSelectVersion}
+        />
       )}
 
       <CopyButton className="link debug-copy" label={M.review.debugCopy} getText={debugJson} />
@@ -645,23 +651,4 @@ function FactCheckSection({
       </div>
     </details>
   );
-}
-
-/** 出典へのリンク。http(s) 以外の URL はリンクにしない */
-function SourceLink({ title, url }: { title: string; url: string }) {
-  const label = title || hostOf(url);
-  if (!/^https?:\/\//i.test(url)) return <span>{label}</span>;
-  return (
-    <a href={url} target="_blank" rel="noreferrer" title={url}>
-      {label}
-    </a>
-  );
-}
-
-function hostOf(url: string): string {
-  try {
-    return new URL(url).host;
-  } catch {
-    return url;
-  }
 }

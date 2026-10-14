@@ -163,6 +163,8 @@ export interface ChatMessage {
   versionId?: string;
   /** assistant の返答にかかった利用量（クラウドのみ） */
   usage?: Usage;
+  /** assistant が Web 検索で見つけて示した出典 */
+  sources?: FactSource[];
 }
 
 /** ニュアンス相談（Phase 2）の問い合わせ */
@@ -173,8 +175,8 @@ export interface ChatRequest {
   /** 返答を書く言語（ブラウザの言語。"ja" など） */
   explanationLanguage: string;
   situation: Situation;
-  /** 表示中の改稿案 */
-  currentRevisedText: string;
+  /** 表示中の改稿案。改稿せずに事実確認だけした場合は undefined（新しい案は作らない） */
+  currentRevisedText?: string;
   /** これまでの改稿案（古い順、表示中のものを含む） */
   previousRevisedTexts: string[];
   /** これまでの会話（今回のユーザー発言は含まない）。assistant は返答と、そのとき作った改稿案 */
@@ -182,6 +184,10 @@ export interface ChatRequest {
   message: string;
   /** 自由入力で書いたユーザーの補足（目的・読み手など）。原文と違い、従うべき指示として渡す */
   note?: string;
+  /** 原文の事実確認の結果。あれば前提として渡す */
+  factCheck?: FactCheck;
+  /** 事実関係を Web 検索で調べてよいか（検索できるプロバイダーだけが使う） */
+  webSearch?: boolean;
 }
 
 export interface ChatReply {
@@ -189,6 +195,8 @@ export interface ChatReply {
   /** 新しい改稿案。解説だけの返答なら undefined */
   revisedText?: string;
   usage?: Usage;
+  /** Web 検索で見つけた出典（検索したときだけ） */
+  sources?: FactSource[];
 }
 
 /** 選択元の記録。表示と将来のApplyの照合に使う。永続化しない */
