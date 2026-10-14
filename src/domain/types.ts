@@ -231,6 +231,8 @@ export type SessionStatus =
   | { kind: 'interrupted' }
   /** 利用者が改稿を中止した（事実確認だけしたいときなど） */
   | { kind: 'cancelled' }
+  /** 長い文章なので、何をするか（校正・事実確認）を利用者が選ぶのを待っている */
+  | { kind: 'choosing' }
   /** Chrome内蔵モデルが未ダウンロード（inProgress: Chromeが既にダウンロード中） */
   | { kind: 'needs-download'; inProgress: boolean }
   | { kind: 'too-long'; limit: number };

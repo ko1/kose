@@ -51,6 +51,8 @@ interface Props {
   canFactCheck: boolean;
   onFactCheck: () => void;
   onCancelFactCheck: () => void;
+  /** 長い文章で、何をするかを選ぶ */
+  onChoose: (action: 'rewrite' | 'factCheck' | 'both') => void;
 }
 
 export function ReviewView({
@@ -75,6 +77,7 @@ export function ReviewView({
   canFactCheck,
   onFactCheck,
   onCancelFactCheck,
+  onChoose,
 }: Props) {
   const version = currentVersion(session);
   // 生成中は途中の改稿文を、前の案の代わりに表示する
@@ -100,6 +103,7 @@ export function ReviewView({
         factCheck={session.factCheck}
         state={factCheckState}
         canFactCheck={canFactCheck}
+        choosing={session.status.kind === 'choosing'}
         onRun={onFactCheck}
         onCancel={onCancelFactCheck}
         onApply={
@@ -109,7 +113,15 @@ export function ReviewView({
         }
       />
 
-      <StatusPanel session={session} download={download} onRetry={onRetry} onDownload={onDownload} onCancel={onCancel} />
+      <StatusPanel
+        session={session}
+        download={download}
+        onRetry={onRetry}
+        onDownload={onDownload}
+        onCancel={onCancel}
+        canFactCheck={canFactCheck}
+        onChoose={onChoose}
+      />
 
       {quizCard && (
         <WaitingQuiz key={quizCard.id} card={quizCard} waiting={waiting} onRate={(r) => onRateCard(quizCard.id, r)} />
@@ -207,9 +219,29 @@ function StatusPanel({
   onRetry,
   onDownload,
   onCancel,
-}: Pick<Props, 'session' | 'download' | 'onRetry' | 'onDownload' | 'onCancel'>) {
+  canFactCheck,
+  onChoose,
+}: Pick<Props, 'session' | 'download' | 'onRetry' | 'onDownload' | 'onCancel' | 'canFactCheck' | 'onChoose'>) {
   const status = session.status;
   switch (status.kind) {
+    case 'choosing':
+      return (
+        <div className="status choosing">
+          <p>{M.review.choosing(countChars(session.sourceText))}</p>
+          <div className="choices">
+            <button className="primary" onClick={() => onChoose('rewrite')}>
+              {M.review.chooseRewrite(M.languages[session.targetLanguage].target)}
+            </button>
+            <button className="primary" onClick={() => onChoose('factCheck')} disabled={!canFactCheck}>
+              {M.review.chooseFactCheck}
+            </button>
+            <button onClick={() => onChoose('both')} disabled={!canFactCheck}>
+              {M.review.chooseBoth}
+            </button>
+          </div>
+          <p className="note">{M.review.choosingNote}</p>
+        </div>
+      );
     case 'running':
       return (
         <div className="status status-running" role="status">
@@ -557,6 +589,7 @@ function FactCheckSection({
   factCheck,
   state,
   canFactCheck,
+  choosing,
   onRun,
   onCancel,
   onApply,
@@ -564,6 +597,8 @@ function FactCheckSection({
   factCheck: FactCheck | undefined;
   state: FactCheckState | null;
   canFactCheck: boolean;
+  /** 長い文章で何をするか選んでいる間は、選択肢に事実確認があるのでボタンを出さない */
+  choosing: boolean;
   onRun: () => void;
   onCancel: () => void;
   /** 指摘を相談に送って、事実を直した案を作る。送れないときは undefined */
@@ -605,7 +640,7 @@ function FactCheckSection({
     </>
   );
 
-  if (!factCheck) return <section className="section fact-check">{runButton}</section>;
+  if (!factCheck) return choosing ? null : <section className="section fact-check">{runButton}</section>;
 
   const searches = factCheck.usage?.webSearches ?? factCheck.queries.length;
   const toFix = factCheck.claims.some((c) => needsFix(c.verdict));

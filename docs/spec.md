@@ -14,6 +14,7 @@ This document is the single source of truth for **kose**, a Chrome extension for
    - Only one right-click item exists because Chrome folds two or more top-level items of one extension into a submenu. The target cannot be inferred from the text: English text may need proofreading or translation into Japanese.
    - The toolbar button and shortcut search all frames for a selection. With no selection (or on pages scripts cannot access), they open the kose window on the **free input** (item 11).
 2. One click opens the **kose window** (a single standalone window, §5.2) or brings it to the front, and processing starts immediately with the last chosen target. There is no "Review" button to press.
+   - **Long texts**: when the text has at least `settings.longTextChars` characters (default 500) and the provider can fact-check (Claude), kose does not start the rewrite. It asks what to do — “Make it good <target>”, “🔍 Fact check” or “Both” (status `choosing`) — because a long text is often someone else's post to verify rather than one's own writing to proofread. Shorter texts, other providers, and `settings.askForLongText = false` keep the immediate rewrite. The same applies to free input and launches from the clipboard.
    - The only exception: if the Chrome built-in AI model is not downloaded yet (`downloadable`), a user gesture is required, so kose shows a “Download the model” button and progress, and resumes automatically when the model becomes available.
 3. **One review session per tab.** Invoking kose from any tab updates the same kose window. Invoking again in the same tab replaces that tab's session.
 4. **The display follows the active tab.** When the user switches browser tabs, the kose window shows that tab's session. Switching to a tab without a session keeps the current display. The header always shows **which tab** the displayed session belongs to.
@@ -115,6 +116,7 @@ Rarely changed settings live on the options page.
 - Selecting a cloud provider saves it and requests its host permission with `chrome.permissions.request`; switching away removes it. If the permission is not granted (denied, or the request was not treated as a user gesture), a warning with an “Allow access to <host>” button is shown until it is.
 - Save buttons are enabled only when there are unsaved changes, and show inline feedback after saving
 - Whether to generate explanations automatically with cloud providers (default: off)
+- Long texts: whether to ask between proofreading and fact checking (default: on) and from how many characters (default: 500)
 - Whether to bring the kose window to the front when kose is invoked (default: on)
 - An explanation of external transmission
 - “Mistake notes and review”:

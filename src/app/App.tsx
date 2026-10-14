@@ -99,6 +99,7 @@ export function App({ controller }: { controller: KoseController }) {
                 canFactCheck={snapshot.canFactCheck}
                 onFactCheck={() => controller.factCheck(displayed.source.tabId)}
                 onCancelFactCheck={() => controller.cancelFactCheck(displayed.source.tabId)}
+                onChoose={(action) => controller.choose(displayed.source.tabId, action)}
                 debugJson={() =>
                   buildDebugExport(displayed, settings, {
                     extensionVersion: chrome.runtime.getManifest().version,

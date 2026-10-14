@@ -46,6 +46,10 @@ const settingsSchema = z.object({
   autoExplainCloud: z.boolean().catch(false),
   /** 同じ言語の校正で見つかった客観的な誤りを自動で記録するか（Phase 3） */
   autoSaveMistakes: z.boolean().catch(true),
+  /** 長い文章では、すぐ校正せずに何をするか（校正・事実確認）を選ばせるか。事実確認できるときだけ */
+  askForLongText: z.boolean().catch(true),
+  /** 「長い文章」とみなす文字数 */
+  longTextChars: z.number().int().positive().catch(500),
   /** 改稿を待つ間に復習クイズを1問出すか（Phase 4） */
   quizWhileWaiting: z.boolean().catch(true),
 });

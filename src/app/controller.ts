@@ -15,7 +15,7 @@ import {
 import { dueCards, extractMistakes } from '../domain/mistakes';
 import type { MistakeCard, PartialExplanation, PendingRequest, Rating, ReviewSession, SessionStatus } from '../domain/types';
 import { needsStructureReview } from '../domain/structure';
-import { trimSelection } from '../domain/text';
+import { countChars, trimSelection } from '../domain/text';
 import { newId } from '../shared/ids';
 import { uiLanguage } from '../shared/locale';
 import { M } from '../shared/messages';
@@ -212,6 +212,27 @@ export class KoseController {
     if (this.settings.targetLanguage !== req.targetLanguage) {
       this.settings = await saveSettings({ targetLanguage: req.targetLanguage });
     }
+    if (this.asksWhatToDo(req.text)) return this.setStatus(tabId, { kind: 'choosing' });
+    await this.run(tabId);
+  }
+
+  /** 長い文章で事実確認もできるなら、すぐ校正せずに何をするかを選ばせる */
+  private asksWhatToDo(text: string): boolean {
+    return (
+      this.settings.askForLongText &&
+      countChars(text) >= this.settings.longTextChars &&
+      this.providerFactory(this.settings).factCheck !== undefined
+    );
+  }
+
+  /** 長い文章で選んだことを実行する */
+  async choose(tabId: number, action: 'rewrite' | 'factCheck' | 'both'): Promise<void> {
+    if (this.sessions.get(tabId)?.status.kind !== 'choosing') return;
+    if (action === 'factCheck') {
+      this.setStatus(tabId, { kind: 'idle' });
+      return this.factCheck(tabId);
+    }
+    if (action === 'both') void this.factCheck(tabId);
     await this.run(tabId);
   }
 

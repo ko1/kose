@@ -172,6 +172,49 @@ describe('KoseController', () => {
     expect(snap().displayed?.messages.at(-1)).toMatchObject({ role: 'assistant', content: '1958年です', sources: [{ title: 'T' }] });
   });
 
+  it('長い文章では、事実確認できるときだけ何をするか選ばせ、選んだことを実行する', async () => {
+    const provider = new FactCheckingProvider();
+    const { snap, controller } = await setup({ provider });
+    const long = 'あ'.repeat(500);
+    await putPending(pending(1, long));
+    await flush();
+    expect(snap().displayed?.status.kind).toBe('choosing');
+    expect(provider.calls).toHaveLength(0);
+    void controller.choose(1, 'factCheck');
+    await flush();
+    expect(snap().displayed?.status.kind).toBe('idle');
+    expect(provider.factCheckCalls).toHaveLength(1);
+    expect(provider.calls).toHaveLength(0);
+
+    await putPending(pending(2, long));
+    await flush();
+    void controller.choose(2, 'both');
+    await flush();
+    expect(provider.factCheckCalls).toHaveLength(2);
+    expect(provider.calls).toHaveLength(1);
+    expect(snap().displayed?.status.kind).toBe('running');
+
+    // 短い文章は今までどおりすぐ校正する
+    await putPending(pending(3, 'あ'.repeat(499)));
+    await flush();
+    expect(provider.calls).toHaveLength(2);
+  });
+
+  it('長い文章でも、設定でオフにしたときや事実確認できないプロバイダーではすぐ校正する', async () => {
+    await saveSettings({ longTextChars: 10 });
+    const plain = await setup();
+    await putPending(pending(1, 'あ'.repeat(20)));
+    await flush();
+    expect(plain.provider.calls).toHaveLength(1);
+
+    await saveSettings({ askForLongText: false });
+    const provider = new FactCheckingProvider();
+    await setup({ provider });
+    await putPending(pending(2, 'あ'.repeat(20)));
+    await flush();
+    expect(provider.calls).toHaveLength(1);
+  });
+
   it('事実確認を中止すると結果を捨てる。検索できないプロバイダーでは実行しない', async () => {
     const provider = new FactCheckingProvider();
     const { snap, controller } = await setup({ provider });

@@ -101,6 +101,8 @@ export function Options() {
         </p>
       </section>
 
+      <LongTextSection settings={settings} save={save} />
+
       <MistakesSection settings={settings} save={save} />
 
       <LauncherSection />
@@ -719,4 +721,46 @@ function describe(a: ProviderAvailability | undefined): string {
     case 'unavailable':
       return M.options.unavailable(a.reason);
   }
+}
+
+/** 長い文章で、校正と事実確認のどちらをするか選ばせる設定 */
+function LongTextSection({ settings, save }: { settings: Settings; save: (patch: Partial<Settings>) => Promise<void> }) {
+  const [chars, setChars] = useState(String(settings.longTextChars));
+  useEffect(() => setChars(String(settings.longTextChars)), [settings.longTextChars]);
+  const commit = () => {
+    const n = Number(chars);
+    if (Number.isInteger(n) && n > 0) {
+      if (n !== settings.longTextChars) void save({ longTextChars: n });
+    } else {
+      setChars(String(settings.longTextChars));
+    }
+  };
+  return (
+    <section>
+      <h2>{M.options.longText}</h2>
+      <label className="checkbox">
+        <input
+          type="checkbox"
+          checked={settings.askForLongText}
+          onChange={(e) => save({ askForLongText: e.target.checked })}
+        />
+        {M.options.askForLongText}
+      </label>
+      <label className="row">
+        <span>{M.options.longTextChars}</span>
+        <input
+          type="number"
+          min={1}
+          step={100}
+          value={chars}
+          disabled={!settings.askForLongText}
+          onChange={(e) => setChars(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => e.key === 'Enter' && commit()}
+        />{' '}
+        {M.options.longTextCharsUnit}
+      </label>
+      <p className="hint">{M.options.longTextNote}</p>
+    </section>
+  );
 }
