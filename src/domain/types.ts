@@ -37,6 +37,8 @@ export interface Usage {
   model: string;
   inputTokens: number;
   outputTokens: number;
+  /** Web 検索の回数（事実確認のみ） */
+  webSearches?: number;
   costUsd?: number;
 }
 
@@ -86,6 +88,56 @@ export interface ExplainRequest {
   explanationLanguage: string;
   /** 自由入力で書いたユーザーの補足（目的・読み手など）。原文と違い、従うべき指示として渡す */
   note?: string;
+}
+
+/** 事実確認の判定 */
+export const VERDICTS = ['inaccurate', 'misleading', 'accurate', 'unverified'] as const;
+export type Verdict = (typeof VERDICTS)[number];
+
+export interface FactSource {
+  title: string;
+  url: string;
+}
+
+/** 原文の中の、確かめられる事実の主張ひとつ */
+export interface FactClaim {
+  /** 原文の該当箇所（原文に含まれる文字列。照合できなければ空） */
+  quote: string;
+  /** 主張の要約 */
+  claim: string;
+  verdict: Verdict;
+  /** 判定の理由（解説の言語） */
+  explanation: string;
+  /** 検索で見つけた根拠。unverified 以外は1件以上ある */
+  sources: FactSource[];
+}
+
+/** 事実確認（校閲）の結果。原文に対して1つ */
+export interface FactCheck {
+  summary: string;
+  claims: FactClaim[];
+  /** 実行時に検索した語句 */
+  queries: string[];
+  createdAt: number;
+  provider?: string;
+  durationMs?: number;
+  usage?: Usage;
+}
+
+export interface FactCheckRequest {
+  requestId: string;
+  sourceText: string;
+  /** 結果を書く言語（ブラウザの言語。"ja" など） */
+  explanationLanguage: string;
+  /** 今日の日付（YYYY-MM-DD）。最近の出来事の判断に使う */
+  today: string;
+  /** 自由入力で書いたユーザーの補足 */
+  note?: string;
+}
+
+/** 事実確認の途中経過（表示用） */
+export interface FactCheckProgress {
+  queries: string[];
 }
 
 export type VersionOrigin = 'initial' | 'regenerate' | 'chat';
@@ -169,6 +221,8 @@ export type SessionStatus =
   | { kind: 'idle' }
   | { kind: 'error'; message: string }
   | { kind: 'interrupted' }
+  /** 利用者が改稿を中止した（事実確認だけしたいときなど） */
+  | { kind: 'cancelled' }
   /** Chrome内蔵モデルが未ダウンロード（inProgress: Chromeが既にダウンロード中） */
   | { kind: 'needs-download'; inProgress: boolean }
   | { kind: 'too-long'; limit: number };
@@ -189,6 +243,8 @@ export interface ReviewSession {
   situation: Situation;
   /** 自由入力で書いたユーザーの補足（目的・読み手など）。原文と違い、従うべき指示として渡す */
   note?: string;
+  /** 事実確認（校閲）の結果。まだ実行していなければ undefined */
+  factCheck?: FactCheck;
   status: SessionStatus;
 }
 

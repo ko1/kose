@@ -3,6 +3,9 @@ import type {
   ChatRequest,
   Explanation,
   ExplainRequest,
+  FactCheck,
+  FactCheckProgress,
+  FactCheckRequest,
   LanguageCode,
   PartialExplanation,
   RewriteRequest,
@@ -44,9 +47,21 @@ export interface AIProvider {
   prewarm?(targetLanguage: LanguageCode): Promise<void>;
   /** モデルのダウンロードなど。ユーザー操作（クリック）の中で呼ぶこと */
   prepare?(targetLanguage: LanguageCode, onProgress: (ratio: number) => void): Promise<void>;
+  /**
+   * 事実確認（校閲）。Web 検索で原文の主張を確かめる。検索できるプロバイダーだけ実装する。
+   * onProgress: 検索した語句が増えるたびに呼ぶ
+   */
+  factCheck?(
+    request: FactCheckRequest,
+    signal?: AbortSignal,
+    onProgress?: (progress: FactCheckProgress) => void,
+  ): Promise<FactCheckResult>;
   /** ニュアンス相談。onPartial: 生成途中の返答（対応するプロバイダーのみ呼ぶ） */
   chat(request: ChatRequest, signal?: AbortSignal, onPartial?: (reply: string) => void): Promise<ChatReply>;
 }
+
+/** プロバイダーが返す事実確認の結果（実行時刻などはコントローラーが付ける） */
+export type FactCheckResult = Pick<FactCheck, 'summary' | 'claims' | 'queries' | 'usage'>;
 
 export class ProviderError extends Error {
   constructor(message: string) {

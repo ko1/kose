@@ -525,3 +525,78 @@ button.link {
   color: var(--warn-fg);
   font-weight: bold;
 }
+
+/* 実行中の表示の右端に「中止」を置く */
+.status-running {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* 事実確認の判定。誤りは赤、誤解を招くは黄、正確は緑、確認できずは無彩色 */
+.fact-inaccurate {
+  background: var(--error-bg);
+  color: var(--error-fg);
+}
+
+.fact-misleading {
+  background: var(--warn-bg);
+  color: var(--warn-fg);
+}
+
+.fact-accurate {
+  background: var(--ins-bg);
+  color: var(--ins-fg);
+}
+
+.fact-unverified {
+  background: var(--bg-subtle);
+  color: var(--fg-muted);
+}
+
+mark[class^='fact-'] {
+  border-radius: 2px;
+  cursor: help;
+}
+
+mark.fact-unverified {
+  background: none;
+  color: inherit;
+  text-decoration: underline dotted var(--fg-muted);
+}
+
+.claims .claim {
+  font-weight: bold;
+}
+
+.claim-explanation {
+  margin: 2px 0 0;
+  font-size: 13px;
+}
+
+.sources,
+.queries {
+  margin: 2px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+}
+
+.sources a {
+  color: var(--accent);
+  overflow-wrap: anywhere;
+}
+
+.queries {
+  list-style: none;
+  padding-left: 0;
+  color: var(--fg-muted);
+}
+
+.fact-actions {
+  margin-top: 8px;
+}
+
+.fact-actions > button + button {
+  margin-left: 8px;
+}

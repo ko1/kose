@@ -5,9 +5,11 @@ import { currentVersion } from '../domain/session';
 import { countChars } from '../domain/text';
 import { structureApplyMessage } from '../domain/structure';
 import { knownMistake } from '../domain/mistakes';
+import { factCheckApplyMessage, markClaims, needsFix } from '../domain/factCheck';
 import type {
   Change,
   ChangeType,
+  FactCheck,
   MistakeCard,
   PartialExplanation,
   Rating,
@@ -18,7 +20,7 @@ import type {
 import { M } from '../shared/messages';
 import { ChatSection } from './ChatSection';
 import { QuizCard } from './QuizCard';
-import type { ChatState, DownloadState, ExplainState } from './controller';
+import type { ChatState, DownloadState, ExplainState, FactCheckState } from './controller';
 
 interface Props {
   session: ReviewSession;
@@ -41,6 +43,13 @@ interface Props {
   /** 記録済みの間違い（解説で再発を示す） */
   cards: readonly MistakeCard[];
   onRateCard: (cardId: string, rating: Rating) => void;
+  /** 実行中の改稿を中止する */
+  onCancel: () => void;
+  factCheckState: FactCheckState | null;
+  /** 今のプロバイダーで事実確認ができるか */
+  canFactCheck: boolean;
+  onFactCheck: () => void;
+  onCancelFactCheck: () => void;
 }
 
 export function ReviewView({
@@ -60,6 +69,11 @@ export function ReviewView({
   quizCard,
   onRateCard,
   cards,
+  onCancel,
+  factCheckState,
+  canFactCheck,
+  onFactCheck,
+  onCancelFactCheck,
 }: Props) {
   const version = currentVersion(session);
   // 生成中は途中の改稿文を、前の案の代わりに表示する
@@ -73,13 +87,28 @@ export function ReviewView({
           <h2>{M.review.original}</h2>
           <span className="meta">{M.review.chars(countChars(session.sourceText))}</span>
         </div>
-        <p className="text original">{session.sourceText}</p>
+        <p className="text original">
+          {session.factCheck ? <MarkedOriginal text={session.sourceText} factCheck={session.factCheck} /> : session.sourceText}
+        </p>
         {session.source.textSource === 'selectionText' && (
           <p className="note">{M.review.selectionTextNote}</p>
         )}
       </section>
 
-      <StatusPanel session={session} download={download} onRetry={onRetry} onDownload={onDownload} />
+      <FactCheckSection
+        factCheck={session.factCheck}
+        state={factCheckState}
+        canFactCheck={canFactCheck}
+        onRun={onFactCheck}
+        onCancel={onCancelFactCheck}
+        onApply={
+          version && session.status.kind !== 'running' && chatState?.kind !== 'running'
+            ? (fc) => onSendChat(factCheckApplyMessage(fc.claims))
+            : undefined
+        }
+      />
+
+      <StatusPanel session={session} download={download} onRetry={onRetry} onDownload={onDownload} onCancel={onCancel} />
 
       {quizCard && (
         <WaitingQuiz key={quizCard.id} card={quizCard} waiting={waiting} onRate={(r) => onRateCard(quizCard.id, r)} />
@@ -171,15 +200,28 @@ function StatusPanel({
   download,
   onRetry,
   onDownload,
-}: Pick<Props, 'session' | 'download' | 'onRetry' | 'onDownload'>) {
+  onCancel,
+}: Pick<Props, 'session' | 'download' | 'onRetry' | 'onDownload' | 'onCancel'>) {
   const status = session.status;
   switch (status.kind) {
     case 'running':
       return (
-        <div className="status" role="status">
-          <span className="spinner" aria-hidden />{' '}
-          {M.review.running(M.languages[session.targetLanguage].target, M.situations[session.situation])}{' '}
-          <Elapsed since={status.startedAt} />
+        <div className="status status-running" role="status">
+          <span>
+            <span className="spinner" aria-hidden />{' '}
+            {M.review.running(M.languages[session.targetLanguage].target, M.situations[session.situation])}{' '}
+            <Elapsed since={status.startedAt} />
+          </span>
+          <button className="link" onClick={onCancel}>
+            {M.review.cancel}
+          </button>
+        </div>
+      );
+    case 'cancelled':
+      return (
+        <div className="status">
+          <p>{M.review.cancelled}</p>
+          <button onClick={onRetry}>{M.review.retry}</button>
         </div>
       );
     case 'error':
@@ -483,4 +525,143 @@ function ExplanationBody({
       )}
     </>
   );
+}
+
+const VERDICT_LABELS = M.factCheck.verdicts;
+
+/** 原文の中で、事実確認した主張の箇所に判定の色を付ける */
+function MarkedOriginal({ text, factCheck }: { text: string; factCheck: FactCheck }) {
+  return (
+    <>
+      {markClaims(text, factCheck.claims).map((seg, i) => {
+        if (seg.claim === undefined) return <span key={i}>{seg.text}</span>;
+        const claim = factCheck.claims[seg.claim];
+        return (
+          <mark key={i} className={`fact-${claim.verdict}`} title={`${VERDICT_LABELS[claim.verdict]}: ${claim.explanation}`}>
+            {seg.text}
+          </mark>
+        );
+      })}
+    </>
+  );
+}
+
+/** 事実確認（校閲）。結果、実行中の経過、または実行ボタンを出す */
+function FactCheckSection({
+  factCheck,
+  state,
+  canFactCheck,
+  onRun,
+  onCancel,
+  onApply,
+}: {
+  factCheck: FactCheck | undefined;
+  state: FactCheckState | null;
+  canFactCheck: boolean;
+  onRun: () => void;
+  onCancel: () => void;
+  /** 指摘を相談に送って、事実を直した案を作る。送れないときは undefined */
+  onApply?: (factCheck: FactCheck) => void;
+}) {
+  if (state?.kind === 'running') {
+    return (
+      <section className="section fact-check">
+        <div className="status status-running" role="status">
+          <span>
+            <span className="spinner" aria-hidden /> {M.factCheck.running} <Elapsed since={state.startedAt} />
+          </span>
+          <button className="link" onClick={onCancel}>
+            {M.factCheck.cancel}
+          </button>
+        </div>
+        {state.queries.length > 0 && (
+          <ul className="queries">
+            {state.queries.map((q, i) => (
+              <li key={i}>🔍 {q}</li>
+            ))}
+          </ul>
+        )}
+      </section>
+    );
+  }
+
+  const runButton = (
+    <>
+      {state?.kind === 'error' && (
+        <p className="status error" role="alert">
+          {state.message}
+        </p>
+      )}
+      <button onClick={onRun} disabled={!canFactCheck}>
+        {factCheck ? M.factCheck.rerun : M.factCheck.run}
+      </button>
+      <p className="note">{canFactCheck ? M.factCheck.costNote : M.factCheck.unsupported}</p>
+    </>
+  );
+
+  if (!factCheck) return <section className="section fact-check">{runButton}</section>;
+
+  const searches = factCheck.usage?.webSearches ?? factCheck.queries.length;
+  const toFix = factCheck.claims.some((c) => needsFix(c.verdict));
+  return (
+    <details className="section explanation fact-check" open>
+      <summary>
+        <h2>{M.factCheck.heading}</h2>
+        <span className="meta">
+          {' '}
+          {M.factCheck.searches(searches)}
+          {factCheck.durationMs !== undefined && ` · ${M.review.durationSeconds(factCheck.durationMs / 1000)}`}
+          {formatCost(factCheck.usage) && ` · ${formatCost(factCheck.usage)}`}
+        </span>
+      </summary>
+      {factCheck.summary && <p className="text">{factCheck.summary}</p>}
+      {factCheck.claims.length === 0 ? (
+        <p className="note">{M.factCheck.noClaims}</p>
+      ) : (
+        <ul className="changes claims">
+          {factCheck.claims.map((c, i) => (
+            <li key={i}>
+              <span className={`badge fact-${c.verdict}`}>{VERDICT_LABELS[c.verdict]}</span>
+              <span className="claim">{c.quote ? `“${c.quote}”` : c.claim}</span>
+              {c.quote && c.claim && <p className="change-explanation">{c.claim}</p>}
+              <p className="claim-explanation">{c.explanation}</p>
+              {c.sources.length > 0 && (
+                <ul className="sources">
+                  {c.sources.map((s, j) => (
+                    <li key={j}>
+                      <SourceLink title={s.title} url={s.url} />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="note">{M.factCheck.disclaimer}</p>
+      <div className="fact-actions">
+        {toFix && onApply && <button onClick={() => onApply(factCheck)}>{M.factCheck.apply}</button>}
+        {runButton}
+      </div>
+    </details>
+  );
+}
+
+/** 出典へのリンク。http(s) 以外の URL はリンクにしない */
+function SourceLink({ title, url }: { title: string; url: string }) {
+  const label = title || hostOf(url);
+  if (!/^https?:\/\//i.test(url)) return <span>{label}</span>;
+  return (
+    <a href={url} target="_blank" rel="noreferrer" title={url}>
+      {label}
+    </a>
+  );
+}
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
 }

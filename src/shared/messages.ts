@@ -75,6 +75,8 @@ const en = {
     running: (target: string, situation: string) => `Making it ${target} (${situation})…`,
     retry: 'Retry',
     interrupted: 'Processing was interrupted.',
+    cancel: 'Cancel',
+    cancelled: 'The rewrite was cancelled.',
     tooLong: (limit: string) => `The text is too long, so kose did not run (limit: ${limit}). Select a shorter range.`,
     downloadInProgress: 'Chrome is downloading the built-in AI model.',
     downloadNeeded:
@@ -151,6 +153,23 @@ const en = {
     applyRequest: (list: string) => `Apply the following structure suggestions and create a restructured version.\n\n${list}`,
   },
 
+  factCheck: {
+    heading: 'Fact check',
+    run: '🔍 Fact check',
+    rerun: 'Check again',
+    costNote: 'Searches the web to check the facts in the original (about $0.01 per search plus tokens).',
+    unsupported: 'Fact checking needs web search. Choose Claude on the settings page to use it.',
+    running: 'Checking the facts…',
+    searches: (n: number) => `${n} searches`,
+    cancel: 'Cancel',
+    verdicts: { accurate: 'Accurate', inaccurate: 'Inaccurate', misleading: 'Misleading', unverified: 'Unverified' },
+    noClaims: 'No checkable factual claims were found.',
+    disclaimer: 'AI fact checks can be wrong. Open the sources to confirm.',
+    apply: 'Create a version that fixes these facts',
+    applyRequest: (list: string) =>
+      `Fix the following factual problems found by the fact check and create a corrected version. Change only what is needed.\n\n${list}`,
+  },
+
   menu: {
     invokeTitle: 'kose: Improve the writing',
   },
@@ -160,6 +179,7 @@ const en = {
     invalidShape: 'The AI response was not in the expected format.',
     noRewrite: 'The AI response did not contain a rewrite.',
     noReply: 'The AI response did not contain a reply.',
+    noFactCheck: 'The AI did not return a fact-check result.',
     noKey: (name: string) => `No ${name} API key is set. Enter it on the settings page.`,
     noPermission: (host: string, name: string) =>
       `Access to ${host} is not allowed. Allow it for ${name} on the settings page.`,
@@ -366,6 +386,8 @@ const ja: Messages = {
     running: (target: string, situation: string) => `${target}（${situation}）にしています…`,
     retry: '再実行',
     interrupted: '処理が中断されました。',
+    cancel: '中止',
+    cancelled: '改稿を中止しました。',
     tooLong: (limit: string) => `文章が長すぎるため実行しませんでした（上限: ${limit}）。選択範囲を短くしてください。`,
     downloadInProgress: 'Chromeが内蔵AIのモデルをダウンロード中です。',
     downloadNeeded:
@@ -440,6 +462,23 @@ const ja: Messages = {
     applyRequest: (list: string) => `次の構成の指摘を反映して、構成を直した案を作ってください。\n\n${list}`,
   },
 
+  factCheck: {
+    heading: '事実確認',
+    run: '🔍 事実確認',
+    rerun: 'もう一度確認',
+    costNote: '原文の事実を Web 検索で確かめます（検索1回 約$0.01＋トークン代）。',
+    unsupported: '事実確認には Web 検索が必要です。使うには設定で Claude を選んでください。',
+    running: '事実を確認しています…',
+    searches: (n: number) => `検索 ${n} 回`,
+    cancel: '中止',
+    verdicts: { accurate: '正確', inaccurate: '誤り', misleading: '誤解を招く', unverified: '確認できず' },
+    noClaims: '確認できる事実の主張は見つかりませんでした。',
+    disclaimer: 'AI の事実確認は誤ることがあります。出典を開いて確かめてください。',
+    apply: '指摘を反映した版を作る',
+    applyRequest: (list: string) =>
+      `次の事実確認の指摘を反映して、事実を直した案を作ってください。直すのは必要な箇所だけにしてください。\n\n${list}`,
+  },
+
   menu: {
     invokeTitle: 'kose: よりよい文章にする',
   },
@@ -449,6 +488,7 @@ const ja: Messages = {
     invalidShape: 'AIの応答が想定した形式ではありませんでした。',
     noRewrite: 'AIの応答に改稿文が含まれていませんでした。',
     noReply: 'AIの応答に返答が含まれていませんでした。',
+    noFactCheck: 'AIから事実確認の結果が返りませんでした。',
     noKey: (name: string) => `${name} のAPIキーが設定されていません。設定画面で入力してください。`,
     noPermission: (host: string, name: string) =>
       `${host} への接続が許可されていません。設定画面で ${name} の接続を許可してください。`,

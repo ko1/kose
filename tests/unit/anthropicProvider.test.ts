@@ -208,6 +208,83 @@ describe('AnthropicProvider', () => {
     }
   });
 
+  it('事実確認は Web 検索と結果報告ツールで問い合わせ、検索語を通知し、pause_turn なら続きを頼む', async () => {
+    const searchEvents = (index: number, query: string): Event[] => [
+      { type: 'content_block_start', index, content_block: { type: 'server_tool_use', id: `s${index}`, name: 'web_search', input: {} } },
+      { type: 'content_block_delta', index, delta: { type: 'input_json_delta', partial_json: '{"query":' } },
+      { type: 'content_block_delta', index, delta: { type: 'input_json_delta', partial_json: JSON.stringify(query) + '}' } },
+      { type: 'content_block_stop', index },
+    ];
+    const searchResult = { type: 'web_search_tool_result', tool_use_id: 's0', content: [{ type: 'web_search_result', url: 'https://example.com/tower', title: 'Tower' }] };
+    const report = {
+      type: 'tool_use',
+      id: 't1',
+      name: 'report_fact_check',
+      input: {
+        summary: '誤りがあります。',
+        claims: [
+          {
+            quote: '1950年',
+            claim: '1950年完成',
+            verdict: 'inaccurate',
+            explanation: '1958年完成',
+            sources: [{ title: 'Tower', url: 'https://example.com/tower' }, { title: 'fake', url: 'https://fake.test/' }],
+          },
+        ],
+      },
+    };
+    const usage = (searches: number) => ({ input_tokens: 1000, output_tokens: 100, cache_creation_input_tokens: null, cache_read_input_tokens: null, server_tool_use: { web_search_requests: searches, web_fetch_requests: 0 } });
+    const responses = [
+      { events: searchEvents(0, '東京タワー 完成年'), final: { stop_reason: 'pause_turn', content: [searchResult], usage: usage(1) } },
+      { events: searchEvents(0, 'Tokyo Tower completed'), final: { stop_reason: 'tool_use', content: [report], usage: usage(1) } },
+    ];
+    const stream = vi.fn((_params: Record<string, unknown>, _opts?: unknown) => {
+      const r = responses.shift()!;
+      return {
+        async *[Symbol.asyncIterator]() {
+          for (const e of r.events) yield e;
+        },
+        finalMessage: async () => ({ model: 'claude-sonnet-5', ...r.final }),
+      };
+    });
+    const client = { beta: { messages: { stream } } } as unknown as Anthropic;
+    const progress: string[][] = [];
+    const result = await new AnthropicProvider(config, () => client).factCheck(
+      { requestId: 'f', sourceText: '東京タワーは1950年完成', explanationLanguage: 'ja', today: '2026-10-14' },
+      undefined,
+      (p) => progress.push(p.queries),
+    );
+
+    expect(stream).toHaveBeenCalledTimes(2);
+    const params = stream.mock.calls[1][0] as { model: string; tools: { type?: string; name: string; strict?: boolean }[]; messages: { role: string }[]; system: string };
+    expect(params.model).toBe('claude-sonnet-5');
+    expect(params.tools[0]).toMatchObject({ type: 'web_search_20260209', name: 'web_search' });
+    expect(params.tools[1]).toMatchObject({ name: 'report_fact_check', strict: true });
+    expect(params.messages.map((m) => m.role)).toEqual(['user', 'assistant']);
+    expect(progress.at(-1)).toEqual(['東京タワー 完成年', 'Tokyo Tower completed']);
+    expect(result.queries).toEqual(['東京タワー 完成年', 'Tokyo Tower completed']);
+    // 検索結果にない URL は出典から外す
+    expect(result.claims[0].sources).toEqual([{ title: 'Tower', url: 'https://example.com/tower' }]);
+    // トークン代（Sonnet 5: $2/$10）と検索2回分（$0.02）
+    expect(result.usage).toMatchObject({ inputTokens: 2000, outputTokens: 200, webSearches: 2 });
+    expect(result.usage?.costUsd).toBeCloseTo(0.004 + 0.002 + 0.02);
+  });
+
+  it('事実確認で結果報告ツールが呼ばれなければエラー。Haiku では基本の Web 検索を使う', async () => {
+    const { client, stream } = fakeClient([], { stop_reason: 'end_turn', content: [{ type: 'text', text: 'done' }] });
+    await expect(
+      new AnthropicProvider({ ...config, explainModel: 'claude-haiku-4-5' }, () => client).factCheck({
+        requestId: 'f',
+        sourceText: 'x',
+        explanationLanguage: 'en',
+        today: '2026-10-14',
+      }),
+    ).rejects.toThrow(/fact-check result/);
+    const params = stream.mock.calls[0][0] as { tools: { type?: string }[]; output_config?: unknown };
+    expect(params.tools[0].type).toBe('web_search_20250305');
+    expect(params.output_config).toBeUndefined();
+  });
+
   it('入力の文字数に上限を設けない', () => {
     expect('checkInput' in new AnthropicProvider(config)).toBe(false);
   });

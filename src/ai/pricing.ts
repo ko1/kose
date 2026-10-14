@@ -17,17 +17,20 @@ function priceOf(model: string): { input: number; output: number } | undefined {
 
 /**
  * トークン数から料金を計算する。料金表にないモデルは undefined。
- * キャッシュ書き込みは入力の1.25倍、読み込みは0.1倍で数える。
+ * キャッシュ書き込みは入力の1.25倍、読み込みは0.1倍で数える。Web 検索は1回 $0.01。
  */
 export function anthropicCostUsd(
   model: string,
-  tokens: { input: number; output: number; cacheWrite?: number; cacheRead?: number },
+  tokens: { input: number; output: number; cacheWrite?: number; cacheRead?: number; webSearches?: number },
 ): number | undefined {
   const price = priceOf(model);
   if (!price) return undefined;
   const input = tokens.input + (tokens.cacheWrite ?? 0) * 1.25 + (tokens.cacheRead ?? 0) * 0.1;
-  return (input * price.input + tokens.output * price.output) / 1_000_000;
+  return (input * price.input + tokens.output * price.output) / 1_000_000 + (tokens.webSearches ?? 0) * WEB_SEARCH_USD;
 }
+
+/** Web 検索1回の料金（1,000回あたり $10） */
+const WEB_SEARCH_USD = 0.01;
 
 /** "$0.0015" のような表示（有効数字2桁）。料金が分からなければ null */
 export function formatCost(usage: Usage | undefined): string | null {

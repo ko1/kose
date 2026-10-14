@@ -15,7 +15,7 @@ kose is a Chrome extension that rewrites text you select into good Japanese or g
 | AI provider | What is sent | Where |
 | --- | --- | --- |
 | Chrome built-in AI (default) | Nothing leaves your device. Processing runs in Chrome on your computer. | — |
-| Claude (Anthropic API) | The text you run kose on, its rewrites, the chosen mode and situation, your nuance-chat messages, and the language for explanations | `api.anthropic.com`, using your own API key |
+| Claude (Anthropic API) | The text you run kose on, its rewrites, the chosen mode and situation, your nuance-chat messages, and the language for explanations. When you press “Fact check”, the text is checked with Anthropic's web search, which sends search queries based on it to a search provider | `api.anthropic.com`, using your own API key |
 | OpenAI API | Same as above | `api.openai.com`, using your own API key |
 | Gemini API (Google) | Same as above | `generativelanguage.googleapis.com`, using your own API key. On Google's free tier, Google may use the content to improve its products. |
 | OpenRouter | Same as above | `openrouter.ai`, using your OpenRouter key; OpenRouter forwards it to the provider of the model you choose. kose asks OpenRouter to use only providers that do not store or train on the data (`data_collection: deny`). |
@@ -70,7 +70,7 @@ kose は、選択した文章をよい日本語・よい英語に改善する Ch
 | AI の選択 | 送信するもの | 送信先 |
 | --- | --- | --- |
 | Chrome 内蔵 AI（既定） | 端末の外には何も送りません。お使いのパソコンの Chrome の中で処理します。 | — |
-| Claude（Anthropic API） | kose にかけた文章、改稿文、選んだ機能と用途、ニュアンス相談のメッセージ、解説に使う言語 | `api.anthropic.com`（あなた自身の API キーを使用） |
+| Claude（Anthropic API） | kose にかけた文章、改稿文、選んだ機能と用途、ニュアンス相談のメッセージ、解説に使う言語。「事実確認」を押したときは Anthropic の Web 検索で確かめるため、文章をもとにした検索語が検索事業者に送られます | `api.anthropic.com`（あなた自身の API キーを使用） |
 | OpenAI API | 同上 | `api.openai.com`（あなた自身の API キーを使用） |
 | Gemini API（Google） | 同上 | `generativelanguage.googleapis.com`（あなた自身の API キーを使用）。Google の無料枠では、送った内容が Google の製品改善に使われることがあります。 |
 | OpenRouter | 同上 | `openrouter.ai`（あなたの OpenRouter のキーを使用）。OpenRouter が、選んだモデルの提供元に転送します。kose は、保存・学習に使わない提供元だけを使うよう指定します（`data_collection: deny`）。 |

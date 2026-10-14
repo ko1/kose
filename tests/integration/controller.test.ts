@@ -1,11 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { AIProvider, InputCheck, ProviderAvailability } from '../../src/ai/provider';
+import type { AIProvider, FactCheckResult, InputCheck, ProviderAvailability } from '../../src/ai/provider';
 import { KoseController } from '../../src/app/controller';
 import type {
   ChatReply,
   ChatRequest,
   Explanation,
   ExplainRequest,
+  FactCheckProgress,
+  FactCheckRequest,
   PartialExplanation,
   PendingRequest,
   RewriteRequest,
@@ -71,6 +73,36 @@ class FakeProvider implements AIProvider {
   }
 }
 
+/** 事実確認（Web 検索）もできるフェイクプロバイダー */
+class FactCheckingProvider extends FakeProvider {
+  factCheckCalls: {
+    request: FactCheckRequest;
+    signal?: AbortSignal;
+    onProgress?: (p: FactCheckProgress) => void;
+    resolve: (v: FactCheckResult) => void;
+  }[] = [];
+  factCheck(request: FactCheckRequest, signal?: AbortSignal, onProgress?: (p: FactCheckProgress) => void) {
+    return new Promise<FactCheckResult>((resolve, reject) => {
+      this.factCheckCalls.push({ request, signal, onProgress, resolve });
+      signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+    });
+  }
+}
+
+const factResult: FactCheckResult = {
+  summary: '一部に誤りがあります。',
+  claims: [
+    {
+      quote: '1950年',
+      claim: '東京タワーは1950年完成',
+      verdict: 'inaccurate',
+      explanation: '1958年完成',
+      sources: [{ title: '東京タワー', url: 'https://example.com/tower' }],
+    },
+  ],
+  queries: ['東京タワー 完成年'],
+};
+
 let seq = 0;
 const pending = (tabId: number, text = `text ${tabId}`, targetLanguage: 'ja' | 'en' = 'en'): PendingRequest => ({
   requestId: `req-${++seq}`,
@@ -91,6 +123,46 @@ async function setup(opts: { provider?: FakeProvider; factory?: (s: Settings) =>
 }
 
 describe('KoseController', () => {
+  it('改稿を待たずに事実確認でき、検索の経過を公開して結果をセッションに保存する', async () => {
+    const provider = new FactCheckingProvider();
+    const { snap, controller } = await setup({ provider });
+    expect(snap().canFactCheck).toBe(true);
+    await putPending(pending(1, '東京タワーは1950年完成'));
+    await flush();
+    void controller.factCheck(1);
+    await flush();
+    expect(provider.factCheckCalls[0].request).toMatchObject({ sourceText: '東京タワーは1950年完成' });
+    expect(provider.factCheckCalls[0].request.today).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    provider.factCheckCalls[0].onProgress?.({ queries: ['東京タワー 完成年'] });
+    expect(snap().factCheckState).toMatchObject({ kind: 'running', queries: ['東京タワー 完成年'] });
+
+    // 改稿を中止しても事実確認は続く
+    controller.cancelRewrite(1);
+    expect(provider.calls[0].signal?.aborted).toBe(true);
+    expect(snap().displayed?.status.kind).toBe('cancelled');
+    provider.factCheckCalls[0].resolve(factResult);
+    await flush();
+    expect(snap().factCheckState).toBeNull();
+    expect(snap().displayed?.factCheck).toMatchObject({ summary: '一部に誤りがあります。', provider: 'builtin' });
+    expect(snap().displayed?.status.kind).toBe('cancelled');
+  });
+
+  it('事実確認を中止すると結果を捨てる。検索できないプロバイダーでは実行しない', async () => {
+    const provider = new FactCheckingProvider();
+    const { snap, controller } = await setup({ provider });
+    await putPending(pending(1));
+    await flush();
+    void controller.factCheck(1);
+    await flush();
+    controller.cancelFactCheck(1);
+    expect(provider.factCheckCalls[0].signal?.aborted).toBe(true);
+    expect(snap().factCheckState).toBeNull();
+    expect(snap().displayed?.factCheck).toBeUndefined();
+
+    const plain = await setup();
+    expect(plain.snap().canFactCheck).toBe(false);
+  });
+
   it('右クリック要求を受けて即時に実行し、結果を表示する', async () => {
     const { provider, snap } = await setup();
     await putPending(pending(1, 'こんにちは', 'en'));

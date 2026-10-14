@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { M } from '../shared/messages';
-import type { ChatReply, Explanation, RewriteResult } from '../domain/types';
+import { VERDICTS, type ChatReply, type Explanation, type FactClaim, type RewriteResult } from '../domain/types';
 
 // モデルに返させるJSONの形。OpenAI Structured Outputs の strict モード、
 // Anthropic の output_config.format、Prompt API の responseConstraint に同じ JSON Schema を渡す。
@@ -42,6 +42,20 @@ export const chatOutputSchema = z.strictObject({
   revisedText: z.string(),
 });
 
+/** 事実確認（校閲）: 原文の主張ごとの判定と根拠 */
+export const factCheckOutputSchema = z.strictObject({
+  summary: z.string(),
+  claims: z.array(
+    z.strictObject({
+      quote: z.string(),
+      claim: z.string(),
+      verdict: z.enum(VERDICTS),
+      explanation: z.string(),
+      sources: z.array(z.strictObject({ title: z.string(), url: z.string() })),
+    }),
+  ),
+});
+
 function toJsonSchema(schema: z.ZodType): Record<string, unknown> {
   const { $schema: _ignored, ...json } = z.toJSONSchema(schema) as Record<string, unknown>;
   return json;
@@ -51,6 +65,7 @@ export const rewriteJsonSchema = (): Record<string, unknown> => toJsonSchema(rew
 export const explainJsonSchema = (withStructure = false): Record<string, unknown> =>
   toJsonSchema(withStructure ? explainWithStructureOutputSchema : explainOutputSchema);
 export const chatJsonSchema = (): Record<string, unknown> => toJsonSchema(chatOutputSchema);
+export const factCheckJsonSchema = (): Record<string, unknown> => toJsonSchema(factCheckOutputSchema);
 
 export class InvalidModelOutputError extends Error {
   constructor(message: string) {
@@ -120,4 +135,49 @@ export function parseChatOutput(raw: string, currentRevisedText: string): ChatRe
     reply: out.reply,
     revisedText: revised === '' || revised === currentRevisedText.trim() ? undefined : out.revisedText,
   };
+}
+
+/**
+ * 事実確認の出力を検証する。根拠は検索で実際に見つかった URL（searchedUrls）だけを残し
+ * （AIが作った URL を見せない）、根拠の残らない判定は「確認できず」に落とす。
+ * 原文と照合できない引用は空にする（原文での強調表示に使わない）。
+ */
+export function parseFactCheckOutput(
+  input: unknown,
+  sourceText: string,
+  searchedUrls: ReadonlySet<string>,
+): { summary: string; claims: FactClaim[] } {
+  const parsed = factCheckOutputSchema.safeParse(input);
+  if (!parsed.success) throw new InvalidModelOutputError(M.errors.invalidShape);
+  const claims = parsed.data.claims
+    .filter((c) => c.claim.trim() !== '')
+    .map((c): FactClaim => {
+      const sources = distinctBy(
+        c.sources.filter((s) => searchedUrls.has(normalizeUrl(s.url))),
+        (s) => normalizeUrl(s.url),
+      );
+      const quote = c.quote.trim();
+      return {
+        ...c,
+        quote: quote !== '' && sourceText.includes(quote) ? quote : '',
+        verdict: sources.length === 0 ? 'unverified' : c.verdict,
+        sources,
+      };
+    });
+  return { summary: parsed.data.summary, claims };
+}
+
+/** 検索結果と AI の引用で表記が揺れても同じ URL とみなす（末尾の / と #以降を無視） */
+export function normalizeUrl(url: string): string {
+  return url.trim().replace(/#.*$/, '').replace(/\/+$/, '');
+}
+
+function distinctBy<T>(items: T[], key: (item: T) => string): T[] {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const k = key(item);
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
 }

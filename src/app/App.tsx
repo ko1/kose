@@ -94,6 +94,11 @@ export function App({ controller }: { controller: KoseController }) {
                 quizCard={quizCard}
                 onRateCard={(id, rating) => controller.rateCard(id, rating)}
                 cards={snapshot.cards}
+                onCancel={() => controller.cancelRewrite(displayed.source.tabId)}
+                factCheckState={snapshot.factCheckState}
+                canFactCheck={snapshot.canFactCheck}
+                onFactCheck={() => controller.factCheck(displayed.source.tabId)}
+                onCancelFactCheck={() => controller.cancelFactCheck(displayed.source.tabId)}
                 debugJson={() =>
                   buildDebugExport(displayed, settings, {
                     extensionVersion: chrome.runtime.getManifest().version,

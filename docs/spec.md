@@ -1,6 +1,6 @@
 # kose Chrome Extension — Design Specification
 
-Updated: 2026-09-27  
+Updated: 2026-10-14  
 Audience: Claude Code  
 Development: WSL2 (Node.js / TypeScript / Vite); verification: Chrome on Windows
 
@@ -33,7 +33,14 @@ This document is the single source of truth for **kose**, a Chrome extension for
     - Shown when kose is invoked with no selection (the text area gets focus), when there are no sessions (with a one-line hint about the other ways to invoke kose), and when “✏️ Free input” is chosen in the header's session list, where it is always the first item.
     - The free-input review is a session with the special tab ID `SCRATCH_TAB_ID = -1` and `source: { tabId: -1, frameId: 0, tabTitle: <“Free input” in the UI language>, textSource: 'script', editable: false }`. It behaves like a tab's session (one at a time; running again replaces it; waiting-time quiz; mistakes are recorded), but no browser tab closes it, so it lasts until the browser exits.
     - The draft is saved in `chrome.storage.session` (never written to disk), like sessions.
-12. **Launch from outside Chrome** (e.g. a Windows shortcut, Ctrl+Alt+K): `chrome.exe "chrome-extension://<ID>/launch.html"` opens a small extension page. It reads the clipboard (`clipboardRead`; `navigator.clipboard.readText()`, falling back to `document.execCommand('paste')`), writes `scratchRequest` with the text, opens the kose window or brings it to the front, and closes its own tab. The kose window replaces the free-input draft with the text and runs it immediately. With an empty or unreadable clipboard it just opens the free input. Windows does not handle `chrome-extension://` itself, so the URL is passed to `chrome.exe`; no resident process is needed.
+12. **Fact check** (校閲, “🔍 Fact check”): checks the factual claims in the original with web search, for one's own writing and for someone else's post alike (proofreading in the wide sense includes checking facts; kose = 校正 = 公正). It works on the original, not on a rewrite, so it can run before, during or without the rewrite.
+    - The button is under the original. It runs only when pressed (searches cost money and take time) and only with a provider that can search the web (currently Claude); otherwise the button is disabled with a note. While it runs, the queries searched so far are listed with a “Cancel” link.
+    - The result belongs to the session (`ReviewSession.factCheck`) and survives regenerations of the rewrite. It shows a short overall summary, then each claim in text order with a verdict — Inaccurate / Misleading / Accurate / Unverified — the quote from the original, the reason and source links. Opinions, feelings and predictions are not judged. The quoted parts of the original are highlighted in the verdict's color (hover for the reason).
+    - Fairness rules: every verdict other than Unverified needs a source that was actually returned by the search. kose keeps only source URLs that appeared in the search results, and downgrades a verdict with no remaining source to Unverified, so the AI cannot back a verdict with an invented URL. A quote that is not in the original is not highlighted. A note says AI fact checks can be wrong.
+    - “Create a version that fixes these facts” (when there is a rewrite and an Inaccurate/Misleading claim) sends the claims, reasons and sources to the chat, which creates a corrected version, like the structure suggestions.
+    - Fact checking costs extra: about $0.01 per search plus tokens; the count of searches and the cost are shown.
+    - **Cancelling the rewrite**: while a rewrite runs, the status line has a “Cancel” link. It stops the rewrite (status `cancelled`, with Retry) and leaves a running fact check alone, so a post can be fact-checked without paying for a rewrite.
+13. **Launch from outside Chrome** (e.g. a Windows shortcut, Ctrl+Alt+K): `chrome.exe "chrome-extension://<ID>/launch.html"` opens a small extension page. It reads the clipboard (`clipboardRead`; `navigator.clipboard.readText()`, falling back to `document.execCommand('paste')`), writes `scratchRequest` with the text, opens the kose window or brings it to the front, and closes its own tab. The kose window replaces the free-input draft with the text and runs it immediately. With an empty or unreadable clipboard it just opens the free input. Windows does not handle `chrome-extension://` itself, so the URL is passed to `chrome.exe`; no resident process is needed.
 
 ### 1.1 Languages
 
@@ -179,6 +186,7 @@ Explanations run automatically for providers that do not send data externally (t
 - Separate models for the rewrite (default `claude-haiku-4-5`) and for the explanation/chat (default `claude-sonnet-5`). Effort (default `low`) is not sent to Haiku, which does not support it.
 - Structured outputs (`output_config.format`) and streaming. For `claude-opus-5`, server-side fallbacks (`fallbacks: "default"`) are enabled; output produced before a fallback is discarded.
 - `refusal` and `max_tokens` stop reasons are reported as errors. `max_tokens` is 64,000 (streamed), so long texts are not cut off.
+- Fact check (§1 item 12) uses the explanation model with effort `medium`, the server-side web search tool (`web_search_20260209`; the basic `web_search_20250305` for Haiku) with `max_uses: 15`, and a strict client tool `report_fact_check` whose arguments carry the result (structured outputs cannot be combined with the citations that web search produces). The search queries are streamed to the UI as they finish. A `pause_turn` is resumed by sending the assistant turn back (at most 4 turns); an answer without `report_fact_check` is an error. Search URLs from `web_search_tool_result` blocks are the only allowed sources. The cost adds $0.01 per search (`usage.server_tool_use.web_search_requests`).
 - The cost of each request is computed from the returned token usage and a price table, and shown in the UI in USD (two significant digits, e.g. `$0.0015`). Dated model IDs in responses (e.g. `claude-haiku-4-5-20251001`) are matched by prefix.
 
 #### OpenAI-compatible providers: OpenAI, Gemini, OpenRouter, Ollama

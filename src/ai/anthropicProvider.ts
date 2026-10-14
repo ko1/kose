@@ -5,6 +5,8 @@ import type {
   ChatRequest,
   Explanation,
   ExplainRequest,
+  FactCheckProgress,
+  FactCheckRequest,
   LanguageCode,
   PartialExplanation,
   RewriteRequest,
@@ -19,15 +21,22 @@ import {
   buildRewritePrompt,
   chatHistoryMessages,
   EXPLAIN_SYSTEM_PROMPT,
+  FACT_CHECK_SYSTEM_PROMPT,
+  FACT_CHECK_TOOL_NAME,
+  buildFactCheckPrompt,
   initialMessages,
   REWRITE_SYSTEM_PROMPT,
 } from './prompts';
-import { AIProvider, ProviderAvailability, ProviderError } from './provider';
+import { AIProvider, FactCheckResult, ProviderAvailability, ProviderError } from './provider';
 import {
   chatJsonSchema,
   explainJsonSchema,
+  factCheckJsonSchema,
+  InvalidModelOutputError,
+  normalizeUrl,
   parseChatOutput,
   parseExplainOutput,
+  parseFactCheckOutput,
   parseRewriteOutput,
   rewriteJsonSchema,
 } from './schema';
@@ -47,6 +56,11 @@ export interface AnthropicConfig {
 
 /** 安全分類器に断られたとき、サーバー側で別モデルに引き継ぐ（fallbacks）を使うモデル */
 const FALLBACK_MODELS = new Set(['claude-opus-5', 'claude-fable-5-1']);
+
+/** 事実確認1回で検索してよい回数の上限（費用の上限にもなる） */
+const MAX_SEARCHES = 15;
+/** サーバー側の検索が長引いて pause_turn で返ってきたとき、続きを頼む回数の上限 */
+const MAX_FACT_CHECK_TURNS = 4;
 
 export class AnthropicProvider implements AIProvider {
   readonly id = 'anthropic' as const;
@@ -138,6 +152,109 @@ export class AnthropicProvider implements AIProvider {
     return { ...parseChatOutput(raw, request.currentRevisedText), usage };
   }
 
+  /**
+   * 事実確認: Web 検索（サーバーツール）で調べさせ、結果は report_fact_check ツールの引数で受け取る。
+   * 構造化出力は検索結果の引用（citations）と併用できないため、strict なツールで形を保証する。
+   */
+  async factCheck(
+    request: FactCheckRequest,
+    signal?: AbortSignal,
+    onProgress?: (progress: FactCheckProgress) => void,
+  ): Promise<FactCheckResult> {
+    // 調べ方と判定には判断力が要るので解説と同じモデルを使う
+    const model = this.config.explainModel;
+    const client = this.clientFactory(this.config.apiKey);
+    const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: 'user', content: buildFactCheckPrompt(request) }];
+    const queries: string[] = [];
+    const urls = new Set<string>();
+    const total = { input: 0, output: 0, cacheWrite: 0, cacheRead: 0, webSearches: 0 };
+    let servedModel = model;
+    try {
+      for (let turn = 0; turn < MAX_FACT_CHECK_TURNS; turn++) {
+        const stream = client.beta.messages.stream(
+          {
+            model,
+            max_tokens: 64000,
+            system: FACT_CHECK_SYSTEM_PROMPT,
+            messages,
+            tools: [
+              { type: webSearchToolType(model), name: 'web_search', max_uses: MAX_SEARCHES },
+              {
+                name: FACT_CHECK_TOOL_NAME,
+                description: 'Report the fact-check result. Call this exactly once, after searching.',
+                input_schema: factCheckJsonSchema() as Anthropic.Beta.BetaTool.InputSchema,
+                strict: true,
+              },
+            ],
+            // 判定の質を優先して、改稿の設定（速さ優先）より深く考えさせる
+            ...(supportsEffort(model) ? { output_config: { effort: 'medium' as const } } : {}),
+            ...(FALLBACK_MODELS.has(model)
+              ? { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' as const }
+              : {}),
+          },
+          { signal },
+        );
+
+        // 検索語は入力の JSON が届き終わった時点で分かるので、それを途中経過として見せる
+        const searching = new Map<number, string>();
+        for await (const event of stream) {
+          if (event.type === 'content_block_start' && event.content_block.type === 'server_tool_use') {
+            if (event.content_block.name === 'web_search') searching.set(event.index, '');
+          } else if (event.type === 'content_block_delta' && event.delta.type === 'input_json_delta') {
+            const partial = searching.get(event.index);
+            if (partial !== undefined) searching.set(event.index, partial + event.delta.partial_json);
+          } else if (event.type === 'content_block_stop') {
+            const json = searching.get(event.index);
+            searching.delete(event.index);
+            const query = json === undefined ? null : searchQuery(json);
+            if (query) {
+              queries.push(query);
+              onProgress?.({ queries: [...queries] });
+            }
+          }
+        }
+
+        const message = await stream.finalMessage();
+        servedModel = message.model;
+        total.input += message.usage.input_tokens;
+        total.output += message.usage.output_tokens;
+        total.cacheWrite += message.usage.cache_creation_input_tokens ?? 0;
+        total.cacheRead += message.usage.cache_read_input_tokens ?? 0;
+        total.webSearches += message.usage.server_tool_use?.web_search_requests ?? 0;
+        for (const block of message.content) {
+          if (block.type === 'web_search_tool_result' && Array.isArray(block.content)) {
+            for (const r of block.content) urls.add(normalizeUrl(r.url));
+          }
+        }
+
+        if (message.stop_reason === 'refusal') throw new ProviderError(M.errors.claudeRefused);
+        if (message.stop_reason === 'max_tokens') throw new ProviderError(M.errors.claudeMaxTokens);
+        const report = message.content.find(
+          (b): b is Anthropic.Beta.BetaToolUseBlock => b.type === 'tool_use' && b.name === FACT_CHECK_TOOL_NAME,
+        );
+        if (report) {
+          return {
+            ...parseFactCheckOutput(report.input, request.sourceText, urls),
+            queries,
+            usage: {
+              model: servedModel,
+              inputTokens: total.input,
+              outputTokens: total.output,
+              webSearches: total.webSearches,
+              costUsd: anthropicCostUsd(servedModel, total),
+            },
+          };
+        }
+        // サーバー側の検索が上限に達して一時停止した。そのまま送り返すと続きから再開する
+        if (message.stop_reason !== 'pause_turn') break;
+        messages.push({ role: 'assistant', content: message.content });
+      }
+      throw new InvalidModelOutputError(M.errors.noFactCheck);
+    } catch (e) {
+      throw describeError(e);
+    }
+  }
+
   /** ストリーミングで問い合わせ、最終的なテキストと利用量を返す。onText: それまでに届いた全文 */
   private async stream(
     model: string,
@@ -206,6 +323,21 @@ function toUsage(model: string, u: Anthropic.Beta.BetaUsage): Usage {
 
 export function supportsEffort(model: string): boolean {
   return !model.startsWith('claude-haiku-');
+}
+
+/** 検索結果を絞り込む版（dynamic filtering）は Haiku では使えない */
+export function webSearchToolType(model: string): 'web_search_20250305' | 'web_search_20260209' {
+  return model.startsWith('claude-haiku-') ? 'web_search_20250305' : 'web_search_20260209';
+}
+
+/** web_search の入力 JSON から検索語を取り出す */
+function searchQuery(json: string): string | null {
+  try {
+    const query = (JSON.parse(json) as { query?: unknown }).query;
+    return typeof query === 'string' && query.trim() !== '' ? query.trim() : null;
+  } catch {
+    return null;
+  }
 }
 
 /** 最後の fallback ブロック以降のテキストを連結する（引き継ぎ前の出力を含めない） */

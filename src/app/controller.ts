@@ -52,6 +52,11 @@ export type ExplainState =
   | { kind: 'running'; startedAt: number; partial?: PartialExplanation }
   | { kind: 'error'; message: string };
 
+/** 事実確認の実行状況。タブ単位でメモリにだけ持つ */
+export type FactCheckState =
+  | { kind: 'running'; startedAt: number; queries: string[] }
+  | { kind: 'error'; message: string };
+
 export interface ControllerSnapshot {
   settings: Settings;
   /** 新しい順 */
@@ -70,6 +75,10 @@ export interface ControllerSnapshot {
   explainStates: Readonly<Record<string, ExplainState>>;
   /** 表示中セッションの相談の状況。何もしていなければ null */
   chatState: ChatState | null;
+  /** 表示中セッションの事実確認の状況。何もしていなければ null */
+  factCheckState: FactCheckState | null;
+  /** 今のプロバイダーで事実確認（Web 検索）ができるか */
+  canFactCheck: boolean;
   /** 表示中セッションの実行時に出した復習クイズのカード。なければ null */
   quizCard: MistakeCard | null;
   /** 今出題できるカード（期限の早い順） */
@@ -101,6 +110,8 @@ export class KoseController {
   private readonly explainAborts = new Map<string, AbortController>();
   private readonly chatStates = new Map<number, ChatState>();
   private readonly chatAborts = new Map<number, AbortController>();
+  private readonly factCheckStates = new Map<number, FactCheckState>();
+  private readonly factCheckAborts = new Map<number, AbortController>();
   private cards: MistakeCard[] = [];
   /** タブごとに、実行を待つ間に出したクイズのカードID（実行ごとに最大1枚） */
   private readonly quizzes = new Map<number, string>();
@@ -162,6 +173,7 @@ export class KoseController {
     for (const a of this.aborts.values()) a.abort();
     for (const a of this.explainAborts.values()) a.abort();
     for (const a of this.chatAborts.values()) a.abort();
+    for (const a of this.factCheckAborts.values()) a.abort();
     clearInterval(this.dueTimer);
   }
 
@@ -188,6 +200,7 @@ export class KoseController {
     this.aborts.get(tabId)?.abort();
     this.abortExplains(existing);
     this.abortChat(tabId);
+    this.cancelFactCheck(tabId);
     this.sessions.set(tabId, createSession(req, this.settings.situation));
     this.assignQuiz(tabId);
     this.displayedTabId = tabId;
@@ -214,6 +227,9 @@ export class KoseController {
     this.partials.delete(tabId);
     this.abortExplains(this.sessions.get(tabId));
     this.abortChat(tabId);
+    this.factCheckAborts.get(tabId)?.abort();
+    this.factCheckAborts.delete(tabId);
+    this.factCheckStates.delete(tabId);
     this.quizzes.delete(tabId);
     if (!this.sessions.delete(tabId)) return;
     if (this.displayedTabId === tabId) this.displayedTabId = this.newestSession()?.source.tabId ?? SCRATCH_TAB_ID;
@@ -293,6 +309,71 @@ export class KoseController {
 
   async retry(tabId: number): Promise<void> {
     await this.run(tabId);
+  }
+
+  /** 実行中の改稿を中止する（事実確認だけしたいときなど）。事実確認は続ける */
+  cancelRewrite(tabId: number): void {
+    const session = this.sessions.get(tabId);
+    if (session?.status.kind !== 'running') return;
+    this.aborts.get(tabId)?.abort();
+    this.aborts.delete(tabId);
+    this.partials.delete(tabId);
+    this.setStatus(tabId, { kind: 'cancelled' });
+  }
+
+  /** 原文の事実確認（校閲）。Web 検索が使えるプロバイダーだけ */
+  async factCheck(tabId: number): Promise<void> {
+    const session = this.sessions.get(tabId);
+    const provider = this.providerFactory(this.settings);
+    if (!session || !provider.factCheck || this.factCheckStates.get(tabId)?.kind === 'running') return;
+
+    const abort = new AbortController();
+    this.factCheckAborts.set(tabId, abort);
+    const startedAt = Date.now();
+    this.factCheckStates.set(tabId, { kind: 'running', startedAt, queries: [] });
+    this.emit();
+    try {
+      const availability = await provider.availability(session.targetLanguage);
+      if (availability.kind !== 'available') {
+        throw new Error(availability.kind === 'unavailable' ? availability.reason : M.factCheck.unsupported);
+      }
+      const result = await provider.factCheck(
+        {
+          requestId: newId(),
+          sourceText: session.sourceText,
+          explanationLanguage: uiLanguage(),
+          today: new Date(startedAt).toISOString().slice(0, 10),
+          note: session.note,
+        },
+        abort.signal,
+        ({ queries }) => {
+          if (abort.signal.aborted) return;
+          this.factCheckStates.set(tabId, { kind: 'running', startedAt, queries });
+          this.emit();
+        },
+      );
+      const latest = this.sessions.get(tabId);
+      if (abort.signal.aborted || latest?.id !== session.id) return;
+      this.factCheckStates.delete(tabId);
+      const now = Date.now();
+      this.update(tabId, {
+        ...latest,
+        factCheck: { ...result, createdAt: now, provider: provider.id, durationMs: now - startedAt },
+      });
+    } catch (e) {
+      if (abort.signal.aborted) return;
+      this.factCheckStates.set(tabId, { kind: 'error', message: errorMessage(e) });
+      this.emit();
+    } finally {
+      if (this.factCheckAborts.get(tabId) === abort) this.factCheckAborts.delete(tabId);
+    }
+  }
+
+  /** 実行中の事実確認を中止する */
+  cancelFactCheck(tabId: number): void {
+    this.factCheckAborts.get(tabId)?.abort();
+    this.factCheckAborts.delete(tabId);
+    if (this.factCheckStates.delete(tabId)) this.emit();
   }
 
   selectVersion(tabId: number, versionId: string): void {
@@ -640,6 +721,8 @@ export class KoseController {
       partialText: this.partials.get(this.displayedTabId) ?? null,
       explainStates: Object.fromEntries(this.explainStates),
       chatState: this.chatStates.get(this.displayedTabId) ?? null,
+      factCheckState: this.factCheckStates.get(this.displayedTabId) ?? null,
+      canFactCheck: this.providerFactory(this.settings).factCheck !== undefined,
       quizCard: this.cards.find((c) => c.id === this.quizzes.get(this.displayedTabId)) ?? null,
       dueCards: dueCards(this.cards, Date.now()),
       cards: this.cards,
