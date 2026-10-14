@@ -225,16 +225,6 @@ export class KoseController {
     );
   }
 
-  /** 長い文章で選んだことを実行する */
-  async choose(tabId: number, action: 'rewrite' | 'factCheck' | 'both'): Promise<void> {
-    if (this.sessions.get(tabId)?.status.kind !== 'choosing') return;
-    if (action === 'factCheck') {
-      this.setStatus(tabId, { kind: 'idle' });
-      return this.factCheck(tabId);
-    }
-    if (action === 'both') void this.factCheck(tabId);
-    await this.run(tabId);
-  }
 
   onTabActivated(info: { tabId: number; windowId: number }): void {
     if (info.windowId === this.ownWindowId) return;
@@ -300,6 +290,18 @@ export class KoseController {
   async runScratch(): Promise<void> {
     const text = trimSelection(this.scratchDraft);
     if (text === '') return;
+    // 同じ文章をまだ校正していない（長い文章で選ぶのを待っている、事実確認だけした）なら、
+    // 聞き直したり事実確認の結果を捨てたりせず、同じレビューで校正する
+    const shown = this.sessions.get(SCRATCH_TAB_ID);
+    if (
+      shown &&
+      shown.versions.length === 0 &&
+      shown.status.kind !== 'running' &&
+      shown.sourceText === text &&
+      (shown.note ?? '') === this.scratchNote.trim()
+    ) {
+      return this.regenerate(SCRATCH_TAB_ID);
+    }
     await this.acceptPending({
       requestId: newId(),
       targetLanguage: this.settings.targetLanguage,
@@ -350,6 +352,8 @@ export class KoseController {
     const session = this.sessions.get(tabId);
     const provider = this.providerFactory(this.settings);
     if (!session || !provider.factCheck || this.factCheckStates.get(tabId)?.kind === 'running') return;
+    // 長い文章で何をするか選ぶのを待っていたなら、事実確認を選んだことになる
+    if (session.status.kind === 'choosing') this.setStatus(tabId, { kind: 'idle' });
 
     const abort = new AbortController();
     this.factCheckAborts.set(tabId, abort);

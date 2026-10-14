@@ -43,7 +43,7 @@ export function App({ controller }: { controller: KoseController }) {
       </header>
       <SettingsBar
         settings={settings}
-        canRegenerate={!!displayed && settingsChanged(displayed, settings)}
+        canRegenerate={!!displayed && (notRewrittenYet(displayed) || settingsChanged(displayed, settings))}
         showRegenerate={!showingScratch}
         onChange={async (patch) => {
           const languageChanged = patch.targetLanguage !== undefined && patch.targetLanguage !== settings.targetLanguage;
@@ -99,7 +99,6 @@ export function App({ controller }: { controller: KoseController }) {
                 canFactCheck={snapshot.canFactCheck}
                 onFactCheck={() => controller.factCheck(displayed.source.tabId)}
                 onCancelFactCheck={() => controller.cancelFactCheck(displayed.source.tabId)}
-                onChoose={(action) => controller.choose(displayed.source.tabId, action)}
                 debugJson={() =>
                   buildDebugExport(displayed, settings, {
                     extensionVersion: chrome.runtime.getManifest().version,
@@ -124,6 +123,11 @@ export function App({ controller }: { controller: KoseController }) {
 function settingsChanged(session: ReviewSession, settings: Settings): boolean {
   const shown = session.status.kind === 'running' ? session : (currentVersion(session) ?? session);
   return shown.targetLanguage !== settings.targetLanguage || shown.situation !== settings.situation;
+}
+
+/** まだ改稿していない（長い文章で選ぶのを待っている、事実確認だけした、など）。kose で校正できる */
+function notRewrittenYet(session: ReviewSession): boolean {
+  return session.versions.length === 0 && session.status.kind !== 'running';
 }
 
 /** 期限が来た間違いをまとめて復習する */

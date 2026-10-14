@@ -600,10 +600,3 @@ mark.fact-unverified {
 .fact-actions > button + button {
   margin-left: 8px;
 }
-
-/* 長い文章で何をするかの選択肢 */
-.choices {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}

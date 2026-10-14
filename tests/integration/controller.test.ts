@@ -172,7 +172,7 @@ describe('KoseController', () => {
     expect(snap().displayed?.messages.at(-1)).toMatchObject({ role: 'assistant', content: '1958年です', sources: [{ title: 'T' }] });
   });
 
-  it('長い文章では、事実確認できるときだけ何をするか選ばせ、選んだことを実行する', async () => {
+  it('長い文章では、事実確認できるときだけ何をするか選ばせ、kose か事実確認のボタンで続ける', async () => {
     const provider = new FactCheckingProvider();
     const { snap, controller } = await setup({ provider });
     const long = 'あ'.repeat(500);
@@ -180,24 +180,39 @@ describe('KoseController', () => {
     await flush();
     expect(snap().displayed?.status.kind).toBe('choosing');
     expect(provider.calls).toHaveLength(0);
-    void controller.choose(1, 'factCheck');
+    // 事実確認を押すと選択は終わり、改稿はしない
+    void controller.factCheck(1);
     await flush();
     expect(snap().displayed?.status.kind).toBe('idle');
     expect(provider.factCheckCalls).toHaveLength(1);
     expect(provider.calls).toHaveLength(0);
-
-    await putPending(pending(2, long));
+    // その後 kose で校正もできる
+    void controller.regenerate(1);
     await flush();
-    void controller.choose(2, 'both');
-    await flush();
-    expect(provider.factCheckCalls).toHaveLength(2);
     expect(provider.calls).toHaveLength(1);
-    expect(snap().displayed?.status.kind).toBe('running');
 
     // 短い文章は今までどおりすぐ校正する
-    await putPending(pending(3, 'あ'.repeat(499)));
+    await putPending(pending(2, 'あ'.repeat(499)));
     await flush();
     expect(provider.calls).toHaveLength(2);
+  });
+
+  it('自由入力で同じ文章をまだ校正していなければ、kose は聞き直さず同じレビューで校正する', async () => {
+    const provider = new FactCheckingProvider();
+    const { snap, controller } = await setup({ provider });
+    controller.setScratchDraft('あ'.repeat(500));
+    await controller.runScratch();
+    expect(snap().displayed?.status.kind).toBe('choosing');
+    // 事実確認だけした後でも、kose は同じレビューで校正し、結果を残す
+    void controller.factCheck(SCRATCH_TAB_ID);
+    await flush();
+    provider.factCheckCalls[0].resolve(factResult);
+    await flush();
+    void controller.runScratch();
+    await flush();
+    expect(provider.calls).toHaveLength(1);
+    expect(snap().displayed?.status.kind).toBe('running');
+    expect(snap().displayed?.factCheck).toBeDefined();
   });
 
   it('長い文章でも、設定でオフにしたときや事実確認できないプロバイダーではすぐ校正する', async () => {
