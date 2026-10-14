@@ -8,7 +8,6 @@ import type {
   RewriteResult,
   Usage,
 } from '../domain/types';
-import { countChars } from '../domain/text';
 import { DEFAULT_OLLAMA_URL } from '../storage/settings';
 import { M } from '../shared/messages';
 import {
@@ -19,7 +18,7 @@ import {
   initialMessages,
   PromptMessage,
 } from './prompts';
-import { AIProvider, InputCheck, ProviderAvailability, ProviderError } from './provider';
+import { AIProvider, ProviderAvailability, ProviderError } from './provider';
 import {
   chatJsonSchema,
   explainJsonSchema,
@@ -118,7 +117,6 @@ function safeUrl(value: string): URL {
 export interface CompatibleConfig {
   apiKey: string;
   model: string;
-  maxInputChars: number;
 }
 
 /** JSON Schema による構造化出力に対応していなかった接続先とモデル。以後は JSON モードで問い合わせる */
@@ -156,12 +154,6 @@ export class OpenAICompatibleProvider implements AIProvider {
     const granted = await chrome.permissions.contains({ origins: [this.spec.origin] });
     if (!granted) return { kind: 'unavailable', reason: M.errors.noPermission(this.spec.host, this.spec.name) };
     return { kind: 'available' };
-  }
-
-  async checkInput(request: RewriteRequest): Promise<InputCheck> {
-    return countChars(request.sourceText) > this.config.maxInputChars
-      ? { ok: false, limit: this.config.maxInputChars, unit: 'chars' }
-      : { ok: true };
   }
 
   async rewrite(request: RewriteRequest, signal?: AbortSignal): Promise<RewriteResult> {

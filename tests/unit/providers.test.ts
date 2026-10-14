@@ -198,7 +198,7 @@ describe('BuiltinProvider', () => {
 });
 
 describe('OpenAICompatibleProvider (OpenAI)', () => {
-  const config = { apiKey: 'sk-test', model: 'test-model', maxInputChars: 10 };
+  const config = { apiKey: 'sk-test', model: 'test-model' };
   const OpenAIProvider = class extends OpenAICompatibleProvider {
     constructor(c: typeof config, fetchImpl?: typeof fetch) {
       super(OPENAI_SPEC, c, fetchImpl);
@@ -256,15 +256,13 @@ describe('OpenAICompatibleProvider (OpenAI)', () => {
     await expect(new OpenAIProvider(config, fetchImpl).rewrite(request)).rejects.toThrow(/API key is invalid/);
   });
 
-  it('入力の文字数上限', async () => {
-    const p = new OpenAIProvider(config);
-    expect(await p.checkInput({ ...request, sourceText: '0123456789' })).toEqual({ ok: true });
-    expect(await p.checkInput({ ...request, sourceText: '01234567890' })).toEqual({ ok: false, limit: 10, unit: 'chars' });
+  it('入力の文字数に上限を設けない', () => {
+    expect('checkInput' in new OpenAIProvider(config)).toBe(false);
   });
 });
 
 describe('OpenAICompatibleProvider (Gemini / OpenRouter / Ollama)', () => {
-  const config = { apiKey: 'key', model: 'm', maxInputChars: 100 };
+  const config = { apiKey: 'key', model: 'm' };
   const ok = (body: unknown) => new Response(JSON.stringify(body), { status: 200 });
 
   it('Gemini は OpenAI 互換のエンドポイントにキーを付けて問い合わせる', async () => {

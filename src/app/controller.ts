@@ -542,9 +542,9 @@ export class KoseController {
         return this.setStatus(tabId, { kind: 'error', message: availability.reason });
       }
 
-      const check = await provider.checkInput(request);
+      const check = await provider.checkInput?.(request);
       if (!isCurrent()) return;
-      if (!check.ok) return this.setStatus(tabId, { kind: 'too-long', limit: check.limit });
+      if (check && !check.ok) return this.setStatus(tabId, { kind: 'too-long', limit: check.limit });
 
       const startedAt = Date.now();
       const output = await provider.rewrite(request, abort.signal, (partial) => {

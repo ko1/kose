@@ -231,7 +231,6 @@ function ProviderSection({
           values={{
             apiKey: settings.anthropicApiKey,
             model: settings.anthropicModel,
-            maxChars: settings.anthropicMaxInputChars,
             effort: settings.anthropicEffort,
             explainModel: settings.anthropicExplainModel,
           }}
@@ -239,7 +238,6 @@ function ProviderSection({
             save({
               anthropicApiKey: v.apiKey,
               anthropicModel: v.model,
-              anthropicMaxInputChars: v.maxChars,
               anthropicEffort: v.effort as Settings['anthropicEffort'],
               anthropicExplainModel: v.explainModel,
             })
@@ -251,8 +249,8 @@ function ProviderSection({
         <CloudSettings
           keyPlaceholder="sk-..."
           defaultModel={DEFAULT_OPENAI_MODEL}
-          values={{ apiKey: settings.openaiApiKey, model: settings.openaiModel, maxChars: settings.openaiMaxInputChars }}
-          onSave={(v) => save({ openaiApiKey: v.apiKey, openaiModel: v.model, openaiMaxInputChars: v.maxChars })}
+          values={{ apiKey: settings.openaiApiKey, model: settings.openaiModel }}
+          onSave={(v) => save({ openaiApiKey: v.apiKey, openaiModel: v.model })}
         />
       )}
 
@@ -260,8 +258,8 @@ function ProviderSection({
         <CloudSettings
           keyPlaceholder="AIza..."
           defaultModel={DEFAULT_GEMINI_MODEL}
-          values={{ apiKey: settings.geminiApiKey, model: settings.geminiModel, maxChars: settings.geminiMaxInputChars }}
-          onSave={(v) => save({ geminiApiKey: v.apiKey, geminiModel: v.model, geminiMaxInputChars: v.maxChars })}
+          values={{ apiKey: settings.geminiApiKey, model: settings.geminiModel }}
+          onSave={(v) => save({ geminiApiKey: v.apiKey, geminiModel: v.model })}
         />
       )}
 
@@ -278,14 +276,8 @@ function ProviderSection({
               <span className="hint">{M.options.openrouterLoginNote}</span>
             </p>
           }
-          values={{
-            apiKey: settings.openrouterApiKey,
-            model: settings.openrouterModel,
-            maxChars: settings.openrouterMaxInputChars,
-          }}
-          onSave={(v) =>
-            save({ openrouterApiKey: v.apiKey, openrouterModel: v.model, openrouterMaxInputChars: v.maxChars })
-          }
+          values={{ apiKey: settings.openrouterApiKey, model: settings.openrouterModel }}
+          onSave={(v) => save({ openrouterApiKey: v.apiKey, openrouterModel: v.model })}
         />
       )}
 
@@ -296,10 +288,8 @@ function ProviderSection({
           secret={false}
           defaultModel={DEFAULT_OLLAMA_MODEL}
           modelHint={M.options.ollamaModelHint}
-          values={{ apiKey: settings.ollamaUrl, model: settings.ollamaModel, maxChars: settings.ollamaMaxInputChars }}
-          onSave={(v) =>
-            save({ ollamaUrl: v.apiKey || DEFAULT_OLLAMA_URL, ollamaModel: v.model, ollamaMaxInputChars: v.maxChars })
-          }
+          values={{ apiKey: settings.ollamaUrl, model: settings.ollamaModel }}
+          onSave={(v) => save({ ollamaUrl: v.apiKey || DEFAULT_OLLAMA_URL, ollamaModel: v.model })}
         />
       )}
 
@@ -522,7 +512,6 @@ function formatDate(ms: number): string {
 interface CloudValues {
   apiKey: string;
   model: string;
-  maxChars: number;
   effort?: string;
   /** 解説（2段目）のモデル。指定したプロバイダーだけ */
   explainModel?: string;
@@ -559,7 +548,6 @@ function CloudSettings({
 }) {
   const [apiKey, setApiKey] = useState(values.apiKey);
   const [model, setModel] = useState(values.model);
-  const [maxChars, setMaxChars] = useState(values.maxChars);
   const [effort, setEffort] = useState(values.effort);
   const [explainModel, setExplainModel] = useState(values.explainModel);
   const [saved, setSaved] = useState<string | null>(null);
@@ -568,22 +556,19 @@ function CloudSettings({
   useEffect(() => {
     setApiKey(values.apiKey);
     setModel(values.model);
-    setMaxChars(values.maxChars);
     setEffort(values.effort);
     setExplainModel(values.explainModel);
-  }, [values.apiKey, values.model, values.maxChars, values.effort, values.explainModel]);
+  }, [values.apiKey, values.model, values.effort, values.explainModel]);
 
   const next: CloudValues = {
     apiKey: apiKey.trim(),
     model: model.trim() || defaultModel,
-    maxChars,
     effort,
     explainModel: explainModel === undefined ? undefined : explainModel.trim() || defaultModel,
   };
   const dirty =
     next.apiKey !== values.apiKey ||
     next.model !== values.model ||
-    next.maxChars !== values.maxChars ||
     next.effort !== values.effort ||
     next.explainModel !== values.explainModel;
 
@@ -639,16 +624,6 @@ function CloudSettings({
             </select>
           </label>
         )}
-        <label className="row">
-          <span>{M.options.maxChars}</span>
-          <input
-            type="number"
-            min={100}
-            step={100}
-            value={maxChars}
-            onChange={(e) => setMaxChars(Number(e.target.value))}
-          />
-        </label>
         {secret && <p className="hint">{M.options.apiKeyNote}</p>}
         <div className="actions">
           <button type="submit" className="primary" disabled={!dirty}>

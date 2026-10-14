@@ -48,7 +48,6 @@ const config = {
   model: 'claude-opus-5',
   explainModel: 'claude-sonnet-5',
   effort: 'low' as const,
-  maxInputChars: 100,
 };
 
 describe('AnthropicProvider', () => {
@@ -209,10 +208,8 @@ describe('AnthropicProvider', () => {
     }
   });
 
-  it('入力の文字数上限', async () => {
-    const p = new AnthropicProvider({ ...config, maxInputChars: 5 });
-    expect(await p.checkInput({ ...request, sourceText: '12345' })).toEqual({ ok: true });
-    expect(await p.checkInput({ ...request, sourceText: '123456' })).toEqual({ ok: false, limit: 5, unit: 'chars' });
+  it('入力の文字数に上限を設けない', () => {
+    expect('checkInput' in new AnthropicProvider(config)).toBe(false);
   });
 
   it('設定で Claude を選ぶと AnthropicProvider を作る', () => {

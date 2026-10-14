@@ -11,7 +11,6 @@ import type {
   RewriteResult,
   Usage,
 } from '../domain/types';
-import { countChars } from '../domain/text';
 import { distinct, extractPartialExplanation, extractPartialStringField } from './partialJson';
 import { anthropicCostUsd } from './pricing';
 import {
@@ -23,7 +22,7 @@ import {
   initialMessages,
   REWRITE_SYSTEM_PROMPT,
 } from './prompts';
-import { AIProvider, InputCheck, ProviderAvailability, ProviderError } from './provider';
+import { AIProvider, ProviderAvailability, ProviderError } from './provider';
 import {
   chatJsonSchema,
   explainJsonSchema,
@@ -44,7 +43,6 @@ export interface AnthropicConfig {
   /** 解説（2段目）のモデル */
   explainModel: string;
   effort: AnthropicEffort;
-  maxInputChars: number;
 }
 
 /** 安全分類器に断られたとき、サーバー側で別モデルに引き継ぐ（fallbacks）を使うモデル */
@@ -74,12 +72,6 @@ export class AnthropicProvider implements AIProvider {
       };
     }
     return { kind: 'available' };
-  }
-
-  async checkInput(request: RewriteRequest): Promise<InputCheck> {
-    return countChars(request.sourceText) > this.config.maxInputChars
-      ? { ok: false, limit: this.config.maxInputChars, unit: 'chars' }
-      : { ok: true };
   }
 
   async rewrite(
@@ -159,7 +151,8 @@ export class AnthropicProvider implements AIProvider {
     const stream = client.beta.messages.stream(
       {
         model,
-        max_tokens: 16000,
+        // 長い文章でも途中で切れないよう、ストリーミングで大きめに取る
+        max_tokens: 64000,
         system,
         messages,
         output_config: {

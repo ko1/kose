@@ -20,7 +20,6 @@ export function createProvider(settings: Settings): AIProvider {
         model: settings.anthropicModel,
         explainModel: settings.anthropicExplainModel,
         effort: settings.anthropicEffort,
-        maxInputChars: settings.anthropicMaxInputChars,
       });
     case 'openai':
     case 'gemini':
@@ -49,16 +48,12 @@ export function compatibleSpec(settings: Settings): CompatibleSpec {
 function compatibleConfig(settings: Settings) {
   switch (settings.provider) {
     case 'gemini':
-      return { apiKey: settings.geminiApiKey, model: settings.geminiModel, maxInputChars: settings.geminiMaxInputChars };
+      return { apiKey: settings.geminiApiKey, model: settings.geminiModel };
     case 'openrouter':
-      return {
-        apiKey: settings.openrouterApiKey,
-        model: settings.openrouterModel,
-        maxInputChars: settings.openrouterMaxInputChars,
-      };
+      return { apiKey: settings.openrouterApiKey, model: settings.openrouterModel };
     case 'ollama':
-      return { apiKey: '', model: settings.ollamaModel, maxInputChars: settings.ollamaMaxInputChars };
+      return { apiKey: '', model: settings.ollamaModel };
     default:
-      return { apiKey: settings.openaiApiKey, model: settings.openaiModel, maxInputChars: settings.openaiMaxInputChars };
+      return { apiKey: settings.openaiApiKey, model: settings.openaiModel };
   }
 }

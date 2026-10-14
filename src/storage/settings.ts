@@ -28,24 +28,19 @@ const settingsSchema = z.object({
   situation: z.enum(SITUATIONS).catch('casual'),
   openaiApiKey: z.string().catch(''),
   openaiModel: z.string().min(1).catch(DEFAULT_OPENAI_MODEL),
-  openaiMaxInputChars: z.number().int().positive().catch(4000),
   anthropicApiKey: z.string().catch(''),
   anthropicModel: z.string().min(1).catch(DEFAULT_ANTHROPIC_MODEL),
   /** 解説（2段目）のモデル。押したときだけ使うので、改稿より上のモデルを既定にする */
   anthropicExplainModel: z.string().min(1).catch(DEFAULT_ANTHROPIC_EXPLAIN_MODEL),
   /** 思考の深さ。校正・翻訳は速さを優先して low を既定にする */
   anthropicEffort: z.enum(['low', 'medium', 'high']).catch('low'),
-  anthropicMaxInputChars: z.number().int().positive().catch(4000),
   geminiApiKey: z.string().catch(''),
   geminiModel: z.string().min(1).catch(DEFAULT_GEMINI_MODEL),
-  geminiMaxInputChars: z.number().int().positive().catch(4000),
   /** 「OpenRouter でログイン」で受け取ったキー、または手で貼ったキー */
   openrouterApiKey: z.string().catch(''),
   openrouterModel: z.string().min(1).catch(DEFAULT_OPENROUTER_MODEL),
-  openrouterMaxInputChars: z.number().int().positive().catch(4000),
   ollamaUrl: z.string().url().catch(DEFAULT_OLLAMA_URL),
   ollamaModel: z.string().min(1).catch(DEFAULT_OLLAMA_MODEL),
-  ollamaMaxInputChars: z.number().int().positive().catch(4000),
   focusOnInvoke: z.boolean().catch(true),
   /** クラウド利用時も解説（2段目）を自動で生成するか。費用が数倍になるので既定はオフ */
   autoExplainCloud: z.boolean().catch(false),

@@ -265,7 +265,6 @@ const en = {
     rewriteModel: 'Rewrite model',
     explainModel: 'Explanation & chat model',
     effort: 'Effort',
-    maxChars: 'Max input (characters)',
     apiKeyNote: 'API keys are stored in this browser’s extension storage (chrome.storage.local). This is not encrypted secure storage.',
     save: 'Save',
     savedButton: 'Saved',
@@ -551,7 +550,6 @@ const ja: Messages = {
     rewriteModel: '改稿のモデル',
     explainModel: '解説・相談のモデル',
     effort: '思考の深さ',
-    maxChars: '入力の上限（文字）',
     apiKeyNote:
       'APIキーはこのブラウザーの拡張機能ストレージ（chrome.storage.local）に保存されます。暗号化されたセキュアストレージではありません。',
     save: '保存',

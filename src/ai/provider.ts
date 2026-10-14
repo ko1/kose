@@ -26,7 +26,8 @@ export interface AIProvider {
   /** クラウドへ外部送信するか（UIで明示する。解説を自動で生成するかの既定にも使う） */
   readonly sendsExternally: boolean;
   availability(targetLanguage: LanguageCode): Promise<ProviderAvailability>;
-  checkInput(request: RewriteRequest): Promise<InputCheck>;
+  /** 入力が大きすぎないか。上限のあるプロバイダー（Chrome内蔵AI）だけ。クラウドは上限を設けない */
+  checkInput?(request: RewriteRequest): Promise<InputCheck>;
   /** 1段目: 改稿文だけを生成する。onPartial: 生成途中の改稿文（対応するプロバイダーのみ呼ぶ） */
   rewrite(
     request: RewriteRequest,

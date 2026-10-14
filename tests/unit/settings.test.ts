@@ -11,10 +11,10 @@ describe('settings', () => {
   });
 
   it('壊れた値は項目ごとに既定値で補う', () => {
-    const s = normalizeSettings({ situation: 'technical', targetLanguage: 'fr', openaiMaxInputChars: -1 });
+    const s = normalizeSettings({ situation: 'technical', targetLanguage: 'fr', autoExplainCloud: 'yes' });
     expect(s.situation).toBe('technical');
     expect(s.targetLanguage).toBe('en');
-    expect(s.openaiMaxInputChars).toBe(4000);
+    expect(s.autoExplainCloud).toBe(false);
     expect(normalizeSettings('garbage')).toEqual(DEFAULT_SETTINGS);
   });
 

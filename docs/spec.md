@@ -101,8 +101,8 @@ The header shows the **source tab** (page title) of the displayed session and a 
 Rarely changed settings live on the options page.
 
 - AI provider, chosen from a dropdown (Chrome built-in / Claude / OpenAI). Only the selected provider's settings are shown below it: for the built-in AI, its availability and the reason if unavailable; for Claude / OpenAI, where the text is sent and the API settings below
-- Claude: API key, rewrite model, explanation/chat model (dropdowns: Haiku 4.5 / Sonnet 5 / Opus 5, or a custom model ID), effort, max input length
-- OpenAI: API key, model, max input length
+- Claude: API key, rewrite model, explanation/chat model (dropdowns: Haiku 4.5 / Sonnet 5 / Opus 5, or a custom model ID), effort
+- OpenAI: API key, model
 - Selecting a cloud provider saves it and requests its host permission with `chrome.permissions.request`; switching away removes it. If the permission is not granted (denied, or the request was not treated as a user gesture), a warning with an “Allow access to <host>” button is shown until it is.
 - Save buttons are enabled only when there are unsaved changes, and show inline feedback after saving
 - Whether to generate explanations automatically with cloud providers (default: off)
@@ -178,7 +178,7 @@ Explanations run automatically for providers that do not send data externally (t
 - Uses the official SDK (`@anthropic-ai/sdk`) from the extension page (`dangerouslyAllowBrowser: true`; the key is the user's own and stays in their browser).
 - Separate models for the rewrite (default `claude-haiku-4-5`) and for the explanation/chat (default `claude-sonnet-5`). Effort (default `low`) is not sent to Haiku, which does not support it.
 - Structured outputs (`output_config.format`) and streaming. For `claude-opus-5`, server-side fallbacks (`fallbacks: "default"`) are enabled; output produced before a fallback is discarded.
-- `refusal` and `max_tokens` stop reasons are reported as errors.
+- `refusal` and `max_tokens` stop reasons are reported as errors. `max_tokens` is 64,000 (streamed), so long texts are not cut off.
 - The cost of each request is computed from the returned token usage and a price table, and shown in the UI in USD (two significant digits, e.g. `$0.0015`). Dated model IDs in responses (e.g. `claude-haiku-4-5-20251001`) are matched by prefix.
 
 #### OpenAI-compatible providers: OpenAI, Gemini, OpenRouter, Ollama
@@ -404,7 +404,7 @@ Listeners (`contextMenus.onClicked`, `action.onClicked`, `commands.onCommand` fo
 ### 5.5 Input length
 
 - The original always shows its character count.
-- Above the provider's limit (built-in AI: computed from the input quota; Claude/OpenAI: 4,000 characters by default, configurable) kose does not run and shows the limit.
+- Cloud providers have no input limit, so long texts can be sent as they are; the cost grows with the length. Chrome built-in AI has a real limit computed from its input quota: above it kose does not run and shows the limit.
 
 ### 5.6 Apply (Replace) rules (not implemented)
 
