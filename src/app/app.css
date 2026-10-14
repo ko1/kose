@@ -556,6 +556,17 @@ button.link {
   color: var(--fg-muted);
 }
 
+/* 事実確認中の主張（待機中・確認中） */
+.fact-pending {
+  background: var(--bg-subtle);
+  color: var(--fg-muted);
+}
+
+.claim-waiting .claim {
+  color: var(--fg-muted);
+  font-weight: normal;
+}
+
 mark[class^='fact-'] {
   border-radius: 2px;
   cursor: help;

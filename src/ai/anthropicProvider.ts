@@ -3,6 +3,7 @@ import { M } from '../shared/messages';
 import type {
   ChatReply,
   ChatRequest,
+  ClaimProgress,
   Explanation,
   ExplainRequest,
   FactCheckProgress,
@@ -25,9 +26,13 @@ import {
   buildRewritePrompt,
   chatHistoryMessages,
   EXPLAIN_SYSTEM_PROMPT,
-  FACT_CHECK_SYSTEM_PROMPT,
-  FACT_CHECK_TOOL_NAME,
+  buildClaimCheckPrompt,
   buildFactCheckPrompt,
+  buildFactSummaryPrompt,
+  CLAIM_CHECK_SYSTEM_PROMPT,
+  CLAIM_CHECK_TOOL_NAME,
+  FACT_CLAIMS_SYSTEM_PROMPT,
+  FACT_SUMMARY_SYSTEM_PROMPT,
   initialMessages,
   REWRITE_SYSTEM_PROMPT,
 } from './prompts';
@@ -35,14 +40,18 @@ import { AIProvider, FactCheckResult, ProviderAvailability, ProviderError } from
 import {
   chatJsonSchema,
   chatWithSourcesJsonSchema,
+  claimVerdictJsonSchema,
   explainJsonSchema,
-  factCheckJsonSchema,
+  factClaimsJsonSchema,
+  factSummaryJsonSchema,
   InvalidModelOutputError,
   normalizeUrl,
   parseChatOutput,
   parseChatWithSourcesOutput,
+  parseClaimVerdictOutput,
   parseExplainOutput,
-  parseFactCheckOutput,
+  parseFactClaimsOutput,
+  parseFactSummaryOutput,
   parseRewriteOutput,
   rewriteJsonSchema,
 } from './schema';
@@ -63,12 +72,17 @@ export interface AnthropicConfig {
 /** 安全分類器に断られたとき、サーバー側で別モデルに引き継ぐ（fallbacks）を使うモデル */
 const FALLBACK_MODELS = new Set(['claude-opus-5', 'claude-fable-5-1']);
 
-/** 事実確認1回で検索してよい回数の上限（費用の上限にもなる） */
-const MAX_SEARCHES = 15;
-/** 相談1回で検索してよい回数の上限。足りない分を調べ直すだけなので少なめ */
-const MAX_CHAT_SEARCHES = 5;
+/**
+ * 事実確認で主張1件につき検索してよい回数の上限。品質を優先して、必要なだけ調べられるよう多めに取る
+ * （判定が固まれば、上限より前にやめる）
+ */
+const MAX_CLAIM_SEARCHES = 10;
+/** 事実確認で同時に確かめる主張の数（API のレート制限に当たらない程度） */
+const CLAIM_CONCURRENCY = 4;
+/** 相談1回で検索してよい回数の上限 */
+const MAX_CHAT_SEARCHES = 10;
 /** サーバー側の検索が長引いて pause_turn で返ってきたとき、続きを頼む回数の上限 */
-const MAX_SEARCH_TURNS = 4;
+const MAX_SEARCH_TURNS = 8;
 
 export class AnthropicProvider implements AIProvider {
   readonly id = 'anthropic' as const;
@@ -183,45 +197,116 @@ export class AnthropicProvider implements AIProvider {
     return { ...parseChatOutput(raw, request.currentRevisedText), usage };
   }
 
-  /** 事実確認: Web 検索で調べさせ、結果は report_fact_check ツールの引数で受け取る */
+  /**
+   * 事実確認: 主張を抜き出し、主張ごとに Web 検索で確かめ（並べて実行）、全体の評価をまとめる。
+   * 1件ずつ別の問い合わせにして必要なだけ検索させ、待ち時間は一番長くかかった1件ぶんに抑える
+   */
   async factCheck(
     request: FactCheckRequest,
     signal?: AbortSignal,
     onProgress?: (progress: FactCheckProgress) => void,
   ): Promise<FactCheckResult> {
-    // 途中経過は、検索の経過と書き出し途中の結果を合わせて知らせる
-    let search: SearchProgress = { phase: 'starting', searches: [] };
-    let partial: FactCheckProgress['partial'];
-    const notify = onProgress && (() => onProgress({ ...search, ...(partial ? { partial } : {}) }));
     // 調べ方と判定には判断力が要るので解説と同じモデルを使い、改稿の設定（速さ優先）より深く考えさせる
-    const { input, urls, queries, usage } = await this.searchAndReport({
-      model: this.config.explainModel,
-      system: FACT_CHECK_SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: buildFactCheckPrompt(request) }],
-      tool: {
-        name: FACT_CHECK_TOOL_NAME,
-        description: 'Report the fact-check result. Call this exactly once, after searching.',
-        schema: factCheckJsonSchema(),
-      },
-      maxSearches: MAX_SEARCHES,
-      effort: 'medium',
+    const model = this.config.explainModel;
+    const context = buildFactCheckPrompt(request);
+    const progress: FactCheckProgress = { stage: 'extracting', claims: [] };
+    const notify = () => onProgress?.({ ...progress, claims: [...progress.claims] });
+    notify();
+    const usages: Usage[] = [];
+
+    // 1. 確かめる主張を抜き出す。書き出し途中から一覧に出す
+    const extracted = await this.stream(
+      model,
+      FACT_CLAIMS_SYSTEM_PROMPT,
+      [{ role: 'user', content: context }],
+      factClaimsJsonSchema(),
       signal,
-      onProgress:
-        notify &&
-        ((p) => {
-          search = p;
+      onProgress &&
+        ((text) => {
+          const claims = (parsePartialJson(text) as { claims?: unknown } | null)?.claims;
+          if (!Array.isArray(claims)) return;
+          progress.claims = claims
+            .filter((c): c is Record<string, unknown> => typeof c === 'object' && c !== null)
+            .map((c) => ({ status: 'waiting', quote: stringOr(c.quote), claim: stringOr(c.claim) }));
           notify();
         }),
-      onReportJson:
-        notify &&
-        ((json) => {
-          const parsed = parsePartialJson(json);
-          if (typeof parsed !== 'object' || parsed === null) return;
-          partial = parsed as FactCheckProgress['partial'];
-          notify();
-        }),
+      'medium',
+    );
+    usages.push(extracted.usage);
+    const targets = parseFactClaimsOutput(extracted.text, request.sourceText);
+    progress.stage = 'checking';
+    progress.claims = targets.map((t) => ({ ...t, status: 'waiting' }));
+    notify();
+    if (targets.length === 0) return { summary: '', claims: [], queries: [], usage: sumUsage(usages) };
+
+    // 2. 主張ごとに確かめる。原文の部分はどの主張でも同じなのでキャッシュさせる
+    const queries: string[][] = targets.map(() => []);
+    const errors: unknown[] = [];
+    const claims = await mapConcurrently(targets, CLAIM_CONCURRENCY, async (target, i) => {
+      const set = (p: ClaimProgress) => {
+        progress.claims[i] = p;
+        notify();
+      };
+      try {
+        const { input, urls, queries: q, usage } = await this.searchAndReport({
+          model,
+          system: CLAIM_CHECK_SYSTEM_PROMPT,
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: context, cache_control: { type: 'ephemeral' } },
+                { type: 'text', text: buildClaimCheckPrompt(target) },
+              ],
+            },
+          ],
+          tool: {
+            name: CLAIM_CHECK_TOOL_NAME,
+            description: 'Report the verdict on the claim. Call this exactly once, after searching.',
+            schema: claimVerdictJsonSchema(),
+          },
+          maxSearches: MAX_CLAIM_SEARCHES,
+          effort: 'high',
+          signal,
+          onProgress: (search) => set({ ...target, status: 'checking', search }),
+        });
+        usages.push(usage);
+        queries[i] = q;
+        const result = parseClaimVerdictOutput(input, target, urls);
+        set({ ...target, status: 'done', result });
+        return result;
+      } catch (e) {
+        if (signal?.aborted) throw e;
+        // 1件の失敗で全体を捨てず、その主張だけ「確認できず」にする
+        errors.push(e);
+        const message = e instanceof Error ? e.message : String(e);
+        set({ ...target, status: 'failed', message });
+        return { ...target, verdict: 'unverified' as const, explanation: M.factCheck.claimFailed(message), sources: [] };
+      }
     });
-    return { ...parseFactCheckOutput(input, request.sourceText, urls), queries, usage };
+    // 全部失敗したなら（キーや通信の問題など）、事実確認そのものの失敗とする
+    if (errors.length === targets.length) throw errors[0];
+
+    // 3. 全体の評価をまとめる
+    progress.stage = 'summarizing';
+    notify();
+    const summary = await this.stream(
+      model,
+      FACT_SUMMARY_SYSTEM_PROMPT,
+      [{ role: 'user', content: `${context}\n\n${buildFactSummaryPrompt(claims)}` }],
+      factSummaryJsonSchema(),
+      signal,
+      onProgress &&
+        ((text) => {
+          const partial = extractPartialStringField(text, 'summary');
+          if (partial === null || partial === progress.summary) return;
+          progress.summary = partial;
+          notify();
+        }),
+      'low',
+    );
+    usages.push(summary.usage);
+    return { summary: parseFactSummaryOutput(summary.text), claims, queries: queries.flat(), usage: sumUsage(usages) };
   }
 
   /**
@@ -362,7 +447,7 @@ export class AnthropicProvider implements AIProvider {
         messages.push({ role: 'assistant', content: message.content });
       }
       throw new InvalidModelOutputError(
-        tool.name === FACT_CHECK_TOOL_NAME ? M.errors.noFactCheck : M.errors.noReply,
+        tool.name === CLAIM_CHECK_TOOL_NAME ? M.errors.noFactCheck : M.errors.noReply,
       );
     } catch (e) {
       throw describeError(e);
@@ -377,6 +462,7 @@ export class AnthropicProvider implements AIProvider {
     schema: Record<string, unknown>,
     signal?: AbortSignal,
     onText?: (text: string) => void,
+    effort: AnthropicEffort = this.config.effort,
   ): Promise<{ text: string; usage: Usage }> {
     const client = this.clientFactory(this.config.apiKey);
     const stream = client.beta.messages.stream(
@@ -388,7 +474,7 @@ export class AnthropicProvider implements AIProvider {
         messages,
         output_config: {
           // Haiku 4.5 は effort を受け付けない
-          ...(supportsEffort(model) ? { effort: this.config.effort } : {}),
+          ...(supportsEffort(model) ? { effort } : {}),
           format: { type: 'json_schema', schema },
         },
         ...(FALLBACK_MODELS.has(model) ? { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' as const } : {}),
@@ -419,6 +505,36 @@ export class AnthropicProvider implements AIProvider {
       throw describeError(e);
     }
   }
+}
+
+/** 利用量を合計する（事実確認の複数の問い合わせ） */
+function sumUsage(usages: Usage[]): Usage {
+  const costs = usages.map((u) => u.costUsd);
+  return {
+    model: usages[0]?.model ?? '',
+    inputTokens: usages.reduce((n, u) => n + u.inputTokens, 0),
+    outputTokens: usages.reduce((n, u) => n + u.outputTokens, 0),
+    webSearches: usages.reduce((n, u) => n + (u.webSearches ?? 0), 0),
+    costUsd: costs.includes(undefined) ? undefined : costs.reduce<number>((n, c) => n + (c ?? 0), 0),
+  };
+}
+
+/** items を、同時に limit 件までずつ fn で処理する。結果は items の順。1件でも例外なら全体も例外 */
+async function mapConcurrently<T, R>(items: T[], limit: number, fn: (item: T, index: number) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array<R>(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i], i);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
+function stringOr(value: unknown): string {
+  return typeof value === 'string' ? value : '';
 }
 
 function toUsage(model: string, u: Anthropic.Beta.BetaUsage): Usage {

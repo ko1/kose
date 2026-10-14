@@ -9,8 +9,9 @@ import { factCheckApplyMessage, markClaims, needsFix } from '../domain/factCheck
 import type {
   Change,
   ChangeType,
+  ClaimProgress,
   FactCheck,
-  FactCheckProgress,
+  FactClaim,
   MistakeCard,
   PartialExplanation,
   Rating,
@@ -550,26 +551,48 @@ function ExplanationBody({
 
 const VERDICT_LABELS = M.factCheck.verdicts;
 
-/** 書き出し途中の判定。出典の検証前なので、出典は出さない */
-function PartialFactCheck({ partial }: { partial: NonNullable<FactCheckProgress['partial']> }) {
-  const claims = (partial.claims ?? []).filter((c) => c.claim || c.quote);
+/** 確かめた主張ひとつ（判定・理由・出典） */
+function ClaimItem({ claim: c }: { claim: FactClaim }) {
   return (
-    <>
-      {partial.summary && <p className="text">{partial.summary}</p>}
-      {claims.length > 0 && (
-        <ul className="changes claims">
-          {claims.map((c, i) => (
-            <li key={i}>
-              {c.verdict && c.verdict in VERDICT_LABELS && (
-                <span className={`badge fact-${c.verdict}`}>{VERDICT_LABELS[c.verdict]}</span>
-              )}
-              <span className="claim">{c.quote ? `“${c.quote}”` : c.claim}</span>
-              {c.explanation && <p className="claim-explanation">{c.explanation}</p>}
+    <li>
+      <span className={`badge fact-${c.verdict}`}>{VERDICT_LABELS[c.verdict]}</span>
+      <span className="claim">{c.quote ? `“${c.quote}”` : c.claim}</span>
+      {c.quote && c.claim && <p className="change-explanation">{c.claim}</p>}
+      <p className="claim-explanation">{c.explanation}</p>
+      {c.sources.length > 0 && (
+        <ul className="sources">
+          {c.sources.map((s, j) => (
+            <li key={j}>
+              <SourceLink title={s.title} url={s.url} />
             </li>
           ))}
         </ul>
       )}
-    </>
+    </li>
+  );
+}
+
+/** 確認中の主張ひとつ。待機中・確認中（検索の経過）・判定済み・失敗 */
+function ClaimProgressItem({ claim: c }: { claim: ClaimProgress }) {
+  if (c.status === 'done') return <ClaimItem claim={c.result} />;
+  const label = c.quote ? `“${c.quote}”` : c.claim;
+  if (!label) return null;
+  return (
+    <li className={`claim-${c.status}`}>
+      <span className={`badge fact-${c.status === 'failed' ? 'unverified' : 'pending'}`}>
+        {M.factCheck.claimStatus[c.status]}
+      </span>
+      <span className="claim">{label}</span>
+      {c.status === 'checking' && (
+        <>
+          <p className="claim-explanation note">
+            <span className="spinner" aria-hidden /> {M.factCheck.phases[c.search.phase]}
+          </p>
+          <SearchSteps searches={c.search.searches} />
+        </>
+      )}
+      {c.status === 'failed' && <p className="claim-explanation">{M.factCheck.claimFailed(c.message)}</p>}
+    </li>
   );
 }
 
@@ -609,18 +632,29 @@ function FactCheckSection({
 }) {
   if (state?.kind === 'running') {
     const { progress } = state;
+    const settled = progress.claims.filter((c) => c.status === 'done' || c.status === 'failed').length;
+    const label =
+      progress.stage === 'checking'
+        ? M.factCheck.checking(settled, progress.claims.length)
+        : M.factCheck.stages[progress.stage];
     return (
       <section className="section fact-check">
         <div className="status status-running" role="status">
           <span>
-            <span className="spinner" aria-hidden /> {M.factCheck.phases[progress.phase]} <Elapsed since={state.startedAt} />
+            <span className="spinner" aria-hidden /> {label} <Elapsed since={state.startedAt} />
           </span>
           <button className="link" onClick={onCancel}>
             {M.factCheck.cancel}
           </button>
         </div>
-        <SearchSteps searches={progress.searches} />
-        {progress.partial && <PartialFactCheck partial={progress.partial} />}
+        {progress.summary && <p className="text">{progress.summary}</p>}
+        {progress.claims.length > 0 && (
+          <ul className="changes claims">
+            {progress.claims.map((c, i) => (
+              <ClaimProgressItem key={i} claim={c} />
+            ))}
+          </ul>
+        )}
       </section>
     );
   }
@@ -656,21 +690,7 @@ function FactCheckSection({
       ) : (
         <ul className="changes claims">
           {factCheck.claims.map((c, i) => (
-            <li key={i}>
-              <span className={`badge fact-${c.verdict}`}>{VERDICT_LABELS[c.verdict]}</span>
-              <span className="claim">{c.quote ? `“${c.quote}”` : c.claim}</span>
-              {c.quote && c.claim && <p className="change-explanation">{c.claim}</p>}
-              <p className="claim-explanation">{c.explanation}</p>
-              {c.sources.length > 0 && (
-                <ul className="sources">
-                  {c.sources.map((s, j) => (
-                    <li key={j}>
-                      <SourceLink title={s.title} url={s.url} />
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </li>
+            <ClaimItem key={i} claim={c} />
           ))}
         </ul>
       )}

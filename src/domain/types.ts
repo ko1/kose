@@ -154,9 +154,26 @@ export interface SearchProgress {
   searches: SearchStep[];
 }
 
-/** 事実確認の途中経過（表示用）。partial: 書き出し途中の結果（出典の検証前） */
-export interface FactCheckProgress extends SearchProgress {
-  partial?: { summary?: string; claims?: Partial<FactClaim>[] };
+/**
+ * 事実確認の段階（表示用）。extracting: 確かめる主張を抜き出している、
+ * checking: 主張ごとに Web 検索で確かめている、summarizing: 全体の評価を書いている
+ */
+export type FactCheckStage = 'extracting' | 'checking' | 'summarizing';
+
+/** 主張ひとつの確認の経過（表示用） */
+export type ClaimProgress = Pick<FactClaim, 'quote' | 'claim'> &
+  (
+    | { status: 'waiting' }
+    | { status: 'checking'; search: SearchProgress }
+    | { status: 'done'; result: FactClaim }
+    | { status: 'failed'; message: string }
+  );
+
+/** 事実確認の途中経過（表示用）。summary: 書き出し途中の全体の評価 */
+export interface FactCheckProgress {
+  stage: FactCheckStage;
+  claims: ClaimProgress[];
+  summary?: string;
 }
 
 export type VersionOrigin = 'initial' | 'regenerate' | 'chat';

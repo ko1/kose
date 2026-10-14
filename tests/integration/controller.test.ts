@@ -134,11 +134,20 @@ describe('KoseController', () => {
     await flush();
     expect(provider.factCheckCalls[0].request).toMatchObject({ sourceText: '東京タワーは1950年完成' });
     expect(provider.factCheckCalls[0].request.today).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    provider.factCheckCalls[0].onProgress?.({ phase: 'searching', searches: [{ query: '東京タワー 完成年' }] });
-    expect(snap().factCheckState).toMatchObject({
-      kind: 'running',
-      progress: { phase: 'searching', searches: [{ query: '東京タワー 完成年' }] },
-    });
+    expect(snap().factCheckState).toMatchObject({ kind: 'running', progress: { stage: 'extracting', claims: [] } });
+    const progress: FactCheckProgress = {
+      stage: 'checking',
+      claims: [
+        {
+          status: 'checking',
+          quote: '1950年完成',
+          claim: '1950年完成',
+          search: { phase: 'searching', searches: [{ query: '東京タワー 完成年' }] },
+        },
+      ],
+    };
+    provider.factCheckCalls[0].onProgress?.(progress);
+    expect(snap().factCheckState).toMatchObject({ kind: 'running', progress });
 
     // 改稿を中止しても事実確認は続く
     controller.cancelRewrite(1);

@@ -208,102 +208,152 @@ describe('AnthropicProvider', () => {
     }
   });
 
-  it('事実確認は Web 検索と結果報告ツールで問い合わせ、検索語を通知し、pause_turn なら続きを頼む', async () => {
-    const searchEvents = (index: number, query: string): Event[] => [
-      { type: 'content_block_start', index, content_block: { type: 'server_tool_use', id: `s${index}`, name: 'web_search', input: {} } },
+  describe('事実確認', () => {
+    const factRequest = { requestId: 'f', sourceText: '東京タワーは1950年完成、高さ333m', explanationLanguage: 'ja', today: '2026-10-14' };
+    const claimsJson = JSON.stringify({
+      claims: [
+        { quote: '1950年完成', claim: '東京タワーは1950年に完成した' },
+        { quote: '高さ333m', claim: '東京タワーの高さは333m' },
+      ],
+    });
+    const usage = (searches = 0) => ({ input_tokens: 1000, output_tokens: 100, cache_creation_input_tokens: null, cache_read_input_tokens: null, server_tool_use: { web_search_requests: searches, web_fetch_requests: 0 } });
+    const searchEvents = (index: number, id: string, query: string): Event[] => [
+      { type: 'content_block_start', index, content_block: { type: 'server_tool_use', id, name: 'web_search', input: {} } },
       { type: 'content_block_delta', index, delta: { type: 'input_json_delta', partial_json: '{"query":' } },
       { type: 'content_block_delta', index, delta: { type: 'input_json_delta', partial_json: JSON.stringify(query) + '}' } },
       { type: 'content_block_stop', index },
     ];
-    const searchResult = { type: 'web_search_tool_result', tool_use_id: 's0', content: [{ type: 'web_search_result', url: 'https://example.com/tower', title: 'Tower' }] };
-    const report = {
-      type: 'tool_use',
-      id: 't1',
-      name: 'report_fact_check',
-      input: {
-        summary: '誤りがあります。',
-        claims: [
+    const searchResult = (id: string, url: string) => ({ type: 'web_search_tool_result', tool_use_id: id, content: [{ type: 'web_search_result', url, title: url }] });
+    const verdict = (input: Record<string, unknown>) => ({ type: 'tool_use', id: 'v', name: 'report_verdict', input });
+    type Response = { events: Event[]; final: { stop_reason: string; content: unknown[]; usage: ReturnType<typeof usage> } };
+
+    /** system プロンプトで段を見分けて応答するフェイク。主張の確認は、本文の主張ごとに順に応答を返す */
+    function stagedClient(perClaim: Record<string, Response[]>, summary = '一部に誤りがあります。') {
+      const text = (t: string): Response => ({ events: textDeltas(t), final: { stop_reason: 'end_turn', content: [{ type: 'text', text: t }], usage: usage() } });
+      const stream = vi.fn((params: Record<string, unknown>, _opts?: unknown) => {
+        const system = params.system as string;
+        const messages = params.messages as { content: string | { text: string }[] }[];
+        let r: Response;
+        if (system.includes('only list the claims')) r = text(claimsJson);
+        else if (system.includes('overall assessment')) r = text(JSON.stringify({ summary }));
+        else {
+          const content = messages[0].content as { text: string }[];
+          const key = Object.keys(perClaim).find((k) => content[1].text.includes(k))!;
+          r = perClaim[key].shift()!;
+        }
+        return {
+          async *[Symbol.asyncIterator]() {
+            for (const e of r.events) yield e;
+          },
+          finalMessage: async () => ({ model: 'claude-sonnet-5', ...r.final }),
+        };
+      });
+      return { client: { beta: { messages: { stream } } } as unknown as Anthropic, stream };
+    }
+
+    it('主張を抜き出し、主張ごとに Web 検索つきで並べて確かめ、全体の評価をまとめる', async () => {
+      const { client, stream } = stagedClient({
+        // 1件目: 検索が長引いて pause_turn → 続きで判定
+        1950: [
           {
-            quote: '1950年',
-            claim: '1950年完成',
-            verdict: 'inaccurate',
-            explanation: '1958年完成',
-            sources: [{ title: 'Tower', url: 'https://example.com/tower' }, { title: 'fake', url: 'https://fake.test/' }],
+            events: [...searchEvents(0, 's0', '東京タワー 完成年'), { type: 'content_block_start', index: 1, content_block: searchResult('s0', 'https://example.com/tower') }],
+            final: { stop_reason: 'pause_turn', content: [searchResult('s0', 'https://example.com/tower')], usage: usage(1) },
+          },
+          {
+            events: [{ type: 'content_block_start', index: 0, content_block: { type: 'tool_use', id: 'v', name: 'report_verdict', input: {} } }],
+            final: {
+              stop_reason: 'tool_use',
+              content: [verdict({ verdict: 'inaccurate', explanation: '1958年完成', sources: [{ title: 'Tower', url: 'https://example.com/tower/' }, { title: 'fake', url: 'https://fake.test/' }] })],
+              usage: usage(),
+            },
           },
         ],
-      },
-    };
-    const usage = (searches: number) => ({ input_tokens: 1000, output_tokens: 100, cache_creation_input_tokens: null, cache_read_input_tokens: null, server_tool_use: { web_search_requests: searches, web_fetch_requests: 0 } });
-    const reportJson = JSON.stringify(report.input);
-    const responses = [
-      {
-        events: [...searchEvents(0, '東京タワー 完成年'), { type: 'content_block_start', index: 1, content_block: searchResult }],
-        final: { stop_reason: 'pause_turn', content: [searchResult], usage: usage(1) },
-      },
-      {
-        events: [
-          ...searchEvents(0, 'Tokyo Tower completed'),
-          { type: 'content_block_start', index: 1, content_block: { type: 'tool_use', id: 't1', name: 'report_fact_check', input: {} } },
-          { type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: reportJson.slice(0, 90) } },
-          { type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: reportJson.slice(90) } },
-          { type: 'content_block_stop', index: 1 },
+        // 2件目: 検索結果にない URL しか挙げない → 確認できず
+        333: [
+          {
+            events: searchEvents(0, 's1', '東京タワー 高さ'),
+            final: {
+              stop_reason: 'tool_use',
+              content: [searchResult('s1', 'https://example.com/height'), verdict({ verdict: 'accurate', explanation: '333m', sources: [{ title: 'fake', url: 'https://fake.test/' }] })],
+              usage: usage(1),
+            },
+          },
         ],
-        final: { stop_reason: 'tool_use', content: [report], usage: usage(1) },
-      },
-    ];
-    const stream = vi.fn((_params: Record<string, unknown>, _opts?: unknown) => {
-      const r = responses.shift()!;
-      return {
-        async *[Symbol.asyncIterator]() {
-          for (const e of r.events) yield e;
-        },
-        finalMessage: async () => ({ model: 'claude-sonnet-5', ...r.final }),
-      };
+      });
+      const progress: FactCheckProgress[] = [];
+      const result = await new AnthropicProvider(config, () => client).factCheck(factRequest, undefined, (p) => progress.push(p));
+
+      // 抜き出し → 主張ごとの確認 → まとめ の順に進み、主張は 待機中 → 確認中（検索の経過）→ 判定 と変わる
+      expect(progress[0]).toEqual({ stage: 'extracting', claims: [] });
+      expect(progress.some((p) => p.stage === 'extracting' && p.claims.length === 1)).toBe(true);
+      expect(progress.map((p) => p.stage).filter((s, i, a) => s !== a[i - 1])).toEqual(['extracting', 'checking', 'summarizing']);
+      const checking = progress.find((p) => p.claims[0]?.status === 'checking' && p.claims[0].search.phase === 'reading');
+      expect(checking?.claims[0]).toMatchObject({ search: { searches: [{ query: '東京タワー 完成年', results: [{ url: 'https://example.com/tower' }] }] } });
+      expect(progress.at(-1)?.claims.map((c) => c.status)).toEqual(['done', 'done']);
+      expect(progress.at(-1)?.summary).toBe('一部に誤りがあります。');
+
+      // 抜き出し1回 + 主張1件目2回（pause_turn）+ 2件目1回 + まとめ1回
+      expect(stream).toHaveBeenCalledTimes(5);
+      const claimCalls = stream.mock.calls
+        .map((c) => c[0] as { system: string; tools?: { type?: string; name: string; strict?: boolean }[]; output_config?: { effort?: string }; messages: { role: string; content: unknown }[] })
+        .filter((p) => p.tools);
+      expect(claimCalls).toHaveLength(3);
+      expect(claimCalls[0].tools?.[0]).toMatchObject({ type: 'web_search_20260209', name: 'web_search', max_uses: 10 });
+      expect(claimCalls[0].tools?.[1]).toMatchObject({ name: 'report_verdict', strict: true });
+      expect(claimCalls[0].output_config?.effort).toBe('high');
+      // 原文の部分は主張をまたいでキャッシュする
+      expect(claimCalls[0].messages[0].content).toEqual([
+        expect.objectContaining({ text: expect.stringContaining('東京タワーは1950年完成'), cache_control: { type: 'ephemeral' } }),
+        expect.objectContaining({ text: expect.stringContaining('東京タワーは1950年に完成した') }),
+      ]);
+
+      expect(result.summary).toBe('一部に誤りがあります。');
+      expect(result.claims[0]).toMatchObject({ quote: '1950年完成', verdict: 'inaccurate', sources: [{ title: 'Tower', url: 'https://example.com/tower/' }] });
+      expect(result.claims[1]).toMatchObject({ quote: '高さ333m', verdict: 'unverified', sources: [] });
+      expect(result.queries).toEqual(['東京タワー 完成年', '東京タワー 高さ']);
+      // 5回分のトークン代（Sonnet 5: $2/$10）と検索2回分（$0.02）
+      expect(result.usage).toMatchObject({ inputTokens: 5000, outputTokens: 500, webSearches: 2 });
+      expect(result.usage?.costUsd).toBeCloseTo(5 * (0.002 + 0.001) + 0.02);
     });
-    const client = { beta: { messages: { stream } } } as unknown as Anthropic;
-    const progress: FactCheckProgress[] = [];
-    const result = await new AnthropicProvider(config, () => client).factCheck(
-      { requestId: 'f', sourceText: '東京タワーは1950年完成', explanationLanguage: 'ja', today: '2026-10-14' },
-      undefined,
-      (p) => progress.push(p),
-    );
-    // 段階は 最初 → 検索 → 結果を読む → … → 書き出し と進み、検索語は入力途中から、結果はサイトとともに届く
-    expect(progress[0]).toEqual({ phase: 'starting', searches: [] });
-    expect(progress.map((p) => p.phase)).toEqual(expect.arrayContaining(['searching', 'reading', 'writing']));
-    expect(progress.find((p) => p.phase === 'reading')?.searches).toEqual([
-      { query: '東京タワー 完成年', results: [{ title: 'Tower', url: 'https://example.com/tower' }] },
-    ]);
-    expect(progress.some((p) => p.searches.some((s) => s.query === ''))).toBe(true);
-    const writing = progress.filter((p) => p.phase === 'writing');
-    expect(writing.some((p) => p.partial?.claims?.length === 1 && p.partial.claims[0].verdict !== undefined)).toBe(true);
 
-    expect(stream).toHaveBeenCalledTimes(2);
-    const params = stream.mock.calls[1][0] as { model: string; tools: { type?: string; name: string; strict?: boolean }[]; messages: { role: string }[]; system: string };
-    expect(params.model).toBe('claude-sonnet-5');
-    expect(params.tools[0]).toMatchObject({ type: 'web_search_20260209', name: 'web_search' });
-    expect(params.tools[1]).toMatchObject({ name: 'report_fact_check', strict: true });
-    expect(params.messages.map((m) => m.role)).toEqual(['user', 'assistant']);
-    expect(result.queries).toEqual(['東京タワー 完成年', 'Tokyo Tower completed']);
-    // 検索結果にない URL は出典から外す
-    expect(result.claims[0].sources).toEqual([{ title: 'Tower', url: 'https://example.com/tower' }]);
-    // トークン代（Sonnet 5: $2/$10）と検索2回分（$0.02）
-    expect(result.usage).toMatchObject({ inputTokens: 2000, outputTokens: 200, webSearches: 2 });
-    expect(result.usage?.costUsd).toBeCloseTo(0.004 + 0.002 + 0.02);
-  });
+    it('一部の主張の確認に失敗しても、その主張だけ「確認できず」にして続ける', async () => {
+      const { client } = stagedClient({
+        1950: [{ events: [], final: { stop_reason: 'end_turn', content: [{ type: 'text', text: 'done' }], usage: usage() } }],
+        333: [
+          {
+            events: [],
+            final: {
+              stop_reason: 'tool_use',
+              content: [searchResult('s1', 'https://example.com/height'), verdict({ verdict: 'accurate', explanation: '333m', sources: [{ title: 'h', url: 'https://example.com/height' }] })],
+              usage: usage(1),
+            },
+          },
+        ],
+      });
+      const progress: FactCheckProgress[] = [];
+      const result = await new AnthropicProvider(config, () => client).factCheck(factRequest, undefined, (p) => progress.push(p));
+      expect(result.claims.map((c) => c.verdict)).toEqual(['unverified', 'accurate']);
+      expect(result.claims[0].explanation).toMatch(/fact-check result/);
+      expect(progress.at(-1)?.claims[0]).toMatchObject({ status: 'failed' });
+    });
 
-  it('事実確認で結果報告ツールが呼ばれなければエラー。Haiku では基本の Web 検索を使う', async () => {
-    const { client, stream } = fakeClient([], { stop_reason: 'end_turn', content: [{ type: 'text', text: 'done' }] });
-    await expect(
-      new AnthropicProvider({ ...config, explainModel: 'claude-haiku-4-5' }, () => client).factCheck({
-        requestId: 'f',
-        sourceText: 'x',
-        explanationLanguage: 'en',
-        today: '2026-10-14',
-      }),
-    ).rejects.toThrow(/fact-check result/);
-    const params = stream.mock.calls[0][0] as { tools: { type?: string }[]; output_config?: unknown };
-    expect(params.tools[0].type).toBe('web_search_20250305');
-    expect(params.output_config).toBeUndefined();
+    it('全部の主張の確認に失敗したらエラー。Haiku では基本の Web 検索を使い effort を送らない', async () => {
+      const fail = (): Response[] => [{ events: [], final: { stop_reason: 'end_turn', content: [{ type: 'text', text: 'done' }], usage: usage() } }];
+      const { client, stream } = stagedClient({ 1950: fail(), 333: fail() });
+      await expect(
+        new AnthropicProvider({ ...config, explainModel: 'claude-haiku-4-5' }, () => client).factCheck(factRequest),
+      ).rejects.toThrow(/fact-check result/);
+      const params = stream.mock.calls.map((c) => c[0] as { tools?: { type?: string }[]; output_config?: { effort?: string } }).find((p) => p.tools)!;
+      expect(params.tools?.[0].type).toBe('web_search_20250305');
+      expect(params.output_config).toBeUndefined();
+    });
+
+    it('確かめる主張がなければ検索もまとめもしない', async () => {
+      const { client, stream } = fakeClient(textDeltas('{"claims":[]}'), { stop_reason: 'end_turn', content: [{ type: 'text', text: '{"claims":[]}' }] });
+      const result = await new AnthropicProvider(config, () => client).factCheck(factRequest);
+      expect(stream).toHaveBeenCalledTimes(1);
+      expect(result).toMatchObject({ summary: '', claims: [], queries: [] });
+    });
   });
 
   it('事実確認の後の相談は Web 検索つきで、返答を生成しながら通知し、出典を検証する', async () => {

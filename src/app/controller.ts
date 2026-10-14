@@ -389,7 +389,7 @@ export class KoseController {
     const abort = new AbortController();
     this.factCheckAborts.set(tabId, abort);
     const startedAt = Date.now();
-    this.factCheckStates.set(tabId, { kind: 'running', startedAt, progress: { phase: 'starting', searches: [] } });
+    this.factCheckStates.set(tabId, { kind: 'running', startedAt, progress: { stage: 'extracting', claims: [] } });
     this.emit();
     try {
       const availability = await provider.availability(session.targetLanguage);

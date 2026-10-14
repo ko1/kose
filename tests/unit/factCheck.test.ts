@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { buildChatSystemPrompt } from '../../src/ai/prompts';
-import { normalizeUrl, parseChatOutput, parseChatWithSourcesOutput, parseFactCheckOutput } from '../../src/ai/schema';
+import {
+  normalizeUrl,
+  parseChatOutput,
+  parseChatWithSourcesOutput,
+  parseClaimVerdictOutput,
+  parseFactClaimsOutput,
+} from '../../src/ai/schema';
 import { factCheckApplyMessage, markClaims } from '../../src/domain/factCheck';
 import type { FactClaim } from '../../src/domain/types';
 
@@ -14,38 +20,54 @@ const claim = (over: Partial<FactClaim>): FactClaim => ({
   ...over,
 });
 
-describe('parseFactCheckOutput', () => {
+describe('parseClaimVerdictOutput', () => {
   const searched = new Set([normalizeUrl('https://example.com/tower/')]);
+  const target = { quote: '1950年に完成', claim: '1950年完成' };
 
-  it('検索で見つかった出典だけを残し、根拠のない判定は「確認できず」にする', () => {
-    const out = parseFactCheckOutput(
+  it('検索で見つかった出典だけを重複なく残す', () => {
+    const out = parseClaimVerdictOutput(
       {
-        summary: 's',
-        claims: [
-          {
-            quote: '1950年に完成',
-            claim: '1950年完成',
-            verdict: 'inaccurate',
-            explanation: '1958年',
-            sources: [
-              { title: 'ok', url: 'https://example.com/tower#history' },
-              { title: 'dup', url: 'https://example.com/tower' },
-              { title: 'made up', url: 'https://example.com/fake' },
-            ],
-          },
-          { quote: '原文にない', claim: '高さ', verdict: 'accurate', explanation: 'e', sources: [{ title: 'x', url: 'https://x.test/' }] },
+        verdict: 'inaccurate',
+        explanation: '1958年',
+        sources: [
+          { title: 'ok', url: 'https://example.com/tower#history' },
+          { title: 'dup', url: 'https://example.com/tower' },
+          { title: 'made up', url: 'https://example.com/fake' },
         ],
       },
-      source,
+      target,
       searched,
     );
-    expect(out.claims[0]).toMatchObject({ quote: '1950年に完成', verdict: 'inaccurate' });
-    expect(out.claims[0].sources).toEqual([{ title: 'ok', url: 'https://example.com/tower#history' }]);
-    expect(out.claims[1]).toMatchObject({ quote: '', verdict: 'unverified', sources: [] });
+    expect(out).toMatchObject({ ...target, verdict: 'inaccurate', explanation: '1958年' });
+    expect(out.sources).toEqual([{ title: 'ok', url: 'https://example.com/tower#history' }]);
+  });
+
+  it('根拠の残らない判定は「確認できず」にする', () => {
+    const out = parseClaimVerdictOutput({ verdict: 'accurate', explanation: 'e', sources: [{ title: 'x', url: 'https://x.test/' }] }, target, searched);
+    expect(out).toMatchObject({ verdict: 'unverified', sources: [] });
   });
 
   it('形が違えば例外', () => {
-    expect(() => parseFactCheckOutput({ summary: 's', claims: [{ verdict: 'true' }] }, source, searched)).toThrow();
+    expect(() => parseClaimVerdictOutput({ verdict: 'true' }, target, searched)).toThrow();
+  });
+});
+
+describe('parseFactClaimsOutput', () => {
+  it('原文と照合できない引用は空にし、空の主張は捨てる', () => {
+    const out = parseFactClaimsOutput(
+      JSON.stringify({
+        claims: [
+          { quote: '1950年に完成', claim: '1950年完成' },
+          { quote: '原文にない', claim: '高さ' },
+          { quote: '333m', claim: ' ' },
+        ],
+      }),
+      source,
+    );
+    expect(out).toEqual([
+      { quote: '1950年に完成', claim: '1950年完成' },
+      { quote: '', claim: '高さ' },
+    ]);
   });
 });
 

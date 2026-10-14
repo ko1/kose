@@ -49,19 +49,20 @@ export const chatWithSourcesOutputSchema = chatOutputSchema.extend({
   sources: z.array(sourceSchema),
 });
 
-/** 事実確認（校閲）: 原文の主張ごとの判定と根拠 */
-export const factCheckOutputSchema = z.strictObject({
-  summary: z.string(),
-  claims: z.array(
-    z.strictObject({
-      quote: z.string(),
-      claim: z.string(),
-      verdict: z.enum(VERDICTS),
-      explanation: z.string(),
-      sources: z.array(sourceSchema),
-    }),
-  ),
+/** 事実確認（校閲）1段目: 原文から確かめる主張を抜き出す */
+export const factClaimsOutputSchema = z.strictObject({
+  claims: z.array(z.strictObject({ quote: z.string(), claim: z.string() })),
 });
+
+/** 事実確認 2段目: 主張ひとつの判定と根拠（Anthropic のツールの引数で受け取る） */
+export const claimVerdictOutputSchema = z.strictObject({
+  verdict: z.enum(VERDICTS),
+  explanation: z.string(),
+  sources: z.array(sourceSchema),
+});
+
+/** 事実確認 3段目: 全体の評価 */
+export const factSummaryOutputSchema = z.strictObject({ summary: z.string() });
 
 function toJsonSchema(schema: z.ZodType): Record<string, unknown> {
   const { $schema: _ignored, ...json } = z.toJSONSchema(schema) as Record<string, unknown>;
@@ -73,7 +74,9 @@ export const explainJsonSchema = (withStructure = false): Record<string, unknown
   toJsonSchema(withStructure ? explainWithStructureOutputSchema : explainOutputSchema);
 export const chatJsonSchema = (): Record<string, unknown> => toJsonSchema(chatOutputSchema);
 export const chatWithSourcesJsonSchema = (): Record<string, unknown> => toJsonSchema(chatWithSourcesOutputSchema);
-export const factCheckJsonSchema = (): Record<string, unknown> => toJsonSchema(factCheckOutputSchema);
+export const factClaimsJsonSchema = (): Record<string, unknown> => toJsonSchema(factClaimsOutputSchema);
+export const claimVerdictJsonSchema = (): Record<string, unknown> => toJsonSchema(claimVerdictOutputSchema);
+export const factSummaryJsonSchema = (): Record<string, unknown> => toJsonSchema(factSummaryOutputSchema);
 
 export class InvalidModelOutputError extends Error {
   constructor(message: string) {
@@ -171,30 +174,39 @@ function checkChatReply(out: { reply: string; revisedText: string }, currentRevi
 }
 
 /**
- * 事実確認の出力を検証する。根拠は検索で実際に見つかった URL（searchedUrls）だけを残し
- * （AIが作った URL を見せない）、根拠の残らない判定は「確認できず」に落とす。
- * 原文と照合できない引用は空にする（原文での強調表示に使わない）。
+ * 抜き出した主張を検証する。原文と照合できない引用は空にする（原文での強調表示に使わない）
  */
-export function parseFactCheckOutput(
-  input: unknown,
-  sourceText: string,
-  searchedUrls: ReadonlySet<string>,
-): { summary: string; claims: FactClaim[] } {
-  const parsed = factCheckOutputSchema.safeParse(input);
-  if (!parsed.success) throw new InvalidModelOutputError(M.errors.invalidShape);
-  const claims = parsed.data.claims
-    .filter((c) => c.claim.trim() !== '')
-    .map((c): FactClaim => {
-      const sources = keepFoundSources(c.sources, searchedUrls);
+export function parseFactClaimsOutput(raw: string, sourceText: string): Pick<FactClaim, 'quote' | 'claim'>[] {
+  return parseJson(raw, factClaimsOutputSchema)
+    .claims.filter((c) => c.claim.trim() !== '')
+    .map((c) => {
       const quote = c.quote.trim();
-      return {
-        ...c,
-        quote: quote !== '' && sourceText.includes(quote) ? quote : '',
-        verdict: sources.length === 0 ? 'unverified' : c.verdict,
-        sources,
-      };
+      return { quote: quote !== '' && sourceText.includes(quote) ? quote : '', claim: c.claim };
     });
-  return { summary: parsed.data.summary, claims };
+}
+
+/**
+ * 主張ひとつの判定を検証する。根拠は検索で実際に見つかった URL（searchedUrls）だけを残し
+ * （AIが作った URL を見せない）、根拠の残らない判定は「確認できず」に落とす。
+ */
+export function parseClaimVerdictOutput(
+  input: unknown,
+  target: Pick<FactClaim, 'quote' | 'claim'>,
+  searchedUrls: ReadonlySet<string>,
+): FactClaim {
+  const parsed = claimVerdictOutputSchema.safeParse(input);
+  if (!parsed.success) throw new InvalidModelOutputError(M.errors.invalidShape);
+  const sources = keepFoundSources(parsed.data.sources, searchedUrls);
+  return {
+    ...target,
+    verdict: sources.length === 0 ? 'unverified' : parsed.data.verdict,
+    explanation: parsed.data.explanation,
+    sources,
+  };
+}
+
+export function parseFactSummaryOutput(raw: string): string {
+  return parseJson(raw, factSummaryOutputSchema).summary;
 }
 
 /** 実際に見つかった URL の出典だけを、重複を除いて残す */
