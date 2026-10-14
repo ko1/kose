@@ -225,10 +225,11 @@ del {
   color: var(--fg-muted);
 }
 
+/* 幅が足りなければ kose・事実確認のボタンは次の行の右端に回る */
 .settings-bar {
-  display: grid;
-  grid-template-columns: 1fr 1fr auto;
-  align-items: end;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
   gap: 6px 12px;
   padding: 8px 16px;
   border-bottom: 1px solid var(--border);
@@ -597,6 +598,13 @@ mark.fact-unverified {
   margin-top: 8px;
 }
 
-.fact-actions > button + button {
-  margin-left: 8px;
+.settings-bar .field {
+  flex: 1 1 auto;
+}
+
+.settings-bar .actions,
+.scratch-actions .actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
 }

@@ -162,7 +162,7 @@ const en = {
   factCheck: {
     heading: 'Fact check',
     run: '🔍 Fact check',
-    rerun: 'Check again',
+    retry: 'Retry the fact check',
     costNote: 'Searches the web to check the facts in the original (about $0.01 per search plus tokens).',
     unsupported: 'Fact checking needs web search. Choose Claude on the settings page to use it.',
     running: 'Checking the facts…',
@@ -481,7 +481,7 @@ const ja: Messages = {
   factCheck: {
     heading: '事実確認',
     run: '🔍 事実確認',
-    rerun: 'もう一度確認',
+    retry: '事実確認をやり直す',
     costNote: '原文の事実を Web 検索で確かめます（検索1回 約$0.01＋トークン代）。',
     unsupported: '事実確認には Web 検索が必要です。使うには設定で Claude を選んでください。',
     running: '事実を確認しています…',

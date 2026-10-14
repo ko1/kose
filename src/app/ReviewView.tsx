@@ -604,21 +604,17 @@ function FactCheckSection({
     );
   }
 
-  const runButton = (
-    <>
-      {state?.kind === 'error' && (
-        <p className="status error" role="alert">
-          {state.message}
-        </p>
-      )}
+  // 実行ボタンは上部（kose の隣）にある。ここには失敗したときのやり直しだけを置く
+  const error = state?.kind === 'error' && (
+    <div className="status error" role="alert">
+      <p>{state.message}</p>
       <button onClick={onRun} disabled={!canFactCheck}>
-        {factCheck ? M.factCheck.rerun : M.factCheck.run}
+        {M.factCheck.retry}
       </button>
-      <p className="note">{canFactCheck ? M.factCheck.costNote : M.factCheck.unsupported}</p>
-    </>
+    </div>
   );
 
-  if (!factCheck) return <section className="section fact-check">{runButton}</section>;
+  if (!factCheck) return error ? <section className="section fact-check">{error}</section> : null;
 
   const searches = factCheck.usage?.webSearches ?? factCheck.queries.length;
   const toFix = factCheck.claims.some((c) => needsFix(c.verdict));
@@ -658,10 +654,12 @@ function FactCheckSection({
         </ul>
       )}
       <p className="note">{M.factCheck.disclaimer}</p>
-      <div className="fact-actions">
-        {toFix && onApply && <button onClick={() => onApply(factCheck)}>{M.factCheck.apply}</button>}
-        {runButton}
-      </div>
+      {error}
+      {toFix && onApply && (
+        <div className="fact-actions">
+          <button onClick={() => onApply(factCheck)}>{M.factCheck.apply}</button>
+        </div>
+      )}
     </details>
   );
 }

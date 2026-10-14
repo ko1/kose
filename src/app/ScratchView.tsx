@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { countChars } from '../domain/text';
 import { M } from '../shared/messages';
+import { FactCheckButton, type FactCheckButtonState } from './SettingsBar';
 
 /**
  * 自由入力（emacs の *scratch* のような欄）。ページで選択しなくても、ここに書いて kose にかけられる。
@@ -15,6 +16,8 @@ export function ScratchView({
   onChange,
   onNoteChange,
   onRun,
+  factCheck,
+  onFactCheck,
 }: {
   draft: string;
   note: string;
@@ -26,6 +29,8 @@ export function ScratchView({
   onChange: (draft: string) => void;
   onNoteChange: (note: string) => void;
   onRun: () => void;
+  factCheck: FactCheckButtonState;
+  onFactCheck: () => void;
 }) {
   // 補足が書いてあれば最初から開いておく（閉じたまま効いているのに気づかない、をなくす）
   const [noteOpen, setNoteOpen] = useState(note.trim() !== '');
@@ -82,9 +87,12 @@ export function ScratchView({
         >
           {noteOpen ? M.scratch.noteClose : notePreview ? M.scratch.noteWith(notePreview) : M.scratch.noteOpen}
         </button>
-        <button className="primary" disabled={!canRun} onClick={onRun}>
-          {M.scratch.run}
-        </button>
+        <span className="actions">
+          <FactCheckButton state={factCheck} disabled={draft.trim() === ''} onClick={onFactCheck} />
+          <button className="primary" disabled={!canRun} onClick={onRun}>
+            {M.scratch.run}
+          </button>
+        </span>
       </div>
       {!hasOtherSessions && (
         <p className="note">{M.scratch.usage}</p>

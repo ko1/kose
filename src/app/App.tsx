@@ -45,6 +45,10 @@ export function App({ controller }: { controller: KoseController }) {
         settings={settings}
         canRegenerate={!!displayed && (notRewrittenYet(displayed) || settingsChanged(displayed, settings))}
         showRegenerate={!showingScratch}
+        factCheck={
+          displayed && { available: snapshot.canFactCheck, running: snapshot.factCheckState?.kind === 'running' }
+        }
+        onFactCheck={() => displayed && controller.factCheck(displayed.source.tabId)}
         onChange={async (patch) => {
           const languageChanged = patch.targetLanguage !== undefined && patch.targetLanguage !== settings.targetLanguage;
           await controller.updateSettings(patch);
@@ -74,6 +78,11 @@ export function App({ controller }: { controller: KoseController }) {
                 onChange={(draft) => controller.setScratchDraft(draft)}
                 onNoteChange={(note) => controller.setScratchNote(note)}
                 onRun={() => controller.runScratch()}
+                factCheck={{
+                  available: snapshot.canFactCheck,
+                  running: displayed?.status.kind === 'running' || snapshot.factCheckState?.kind === 'running',
+                }}
+                onFactCheck={() => controller.factCheckScratch()}
               />
             )}
             {displayed && (

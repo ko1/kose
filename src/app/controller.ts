@@ -200,13 +200,8 @@ export class KoseController {
       return;
     }
 
-    this.aborts.get(tabId)?.abort();
-    this.abortExplains(existing);
-    this.abortChat(tabId);
-    this.cancelFactCheck(tabId);
-    this.sessions.set(tabId, createSession(req, this.settings.situation));
+    this.replaceSession(req);
     this.assignQuiz(tabId);
-    this.displayedTabId = tabId;
     this.emit();
     await takePending(tabId, req.requestId);
     if (this.settings.targetLanguage !== req.targetLanguage) {
@@ -214,6 +209,18 @@ export class KoseController {
     }
     if (this.asksWhatToDo(req.text)) return this.setStatus(tabId, { kind: 'choosing' });
     await this.run(tabId);
+  }
+
+  /** タブのレビューを新しい要求のものに置き換えて表示する。前のレビューで実行中のものはすべて止める */
+  private replaceSession(req: PendingRequest): void {
+    const tabId = req.source.tabId;
+    this.aborts.get(tabId)?.abort();
+    this.abortExplains(this.sessions.get(tabId));
+    this.abortChat(tabId);
+    this.cancelFactCheck(tabId);
+    this.quizzes.delete(tabId);
+    this.sessions.set(tabId, createSession(req, this.settings.situation));
+    this.displayedTabId = tabId;
   }
 
   /** 長い文章で事実確認もできるなら、すぐ校正せずに何をするかを選ばせる */
@@ -292,24 +299,39 @@ export class KoseController {
     if (text === '') return;
     // 同じ文章をまだ校正していない（長い文章で選ぶのを待っている、事実確認だけした）なら、
     // 聞き直したり事実確認の結果を捨てたりせず、同じレビューで校正する
-    const shown = this.sessions.get(SCRATCH_TAB_ID);
-    if (
-      shown &&
-      shown.versions.length === 0 &&
-      shown.status.kind !== 'running' &&
-      shown.sourceText === text &&
-      (shown.note ?? '') === this.scratchNote.trim()
-    ) {
+    const shown = this.sameScratch(text);
+    if (shown && shown.versions.length === 0 && shown.status.kind !== 'running') {
       return this.regenerate(SCRATCH_TAB_ID);
     }
-    await this.acceptPending({
+    await this.acceptPending(this.scratchRequest(text));
+  }
+
+  /** 自由入力の下書きを事実確認する。同じ文章のレビューがあればそこで、なければ校正せずに新しく作る */
+  async factCheckScratch(): Promise<void> {
+    const text = trimSelection(this.scratchDraft);
+    if (text === '') return;
+    if (!this.sameScratch(text)) {
+      this.replaceSession(this.scratchRequest(text));
+      this.update(SCRATCH_TAB_ID, this.sessions.get(SCRATCH_TAB_ID)!);
+    }
+    await this.factCheck(SCRATCH_TAB_ID);
+  }
+
+  /** 表示中の自由入力のレビューが、この文章と補足のものなら返す */
+  private sameScratch(text: string): ReviewSession | undefined {
+    const shown = this.sessions.get(SCRATCH_TAB_ID);
+    return shown && shown.sourceText === text && (shown.note ?? '') === this.scratchNote.trim() ? shown : undefined;
+  }
+
+  private scratchRequest(text: string): PendingRequest {
+    return {
       requestId: newId(),
       targetLanguage: this.settings.targetLanguage,
       text,
       source: SCRATCH_SOURCE,
       createdAt: Date.now(),
       ...(this.scratchNote.trim() ? { note: this.scratchNote.trim() } : {}),
-    });
+    };
   }
 
   async updateSettings(patch: Partial<Settings>): Promise<void> {

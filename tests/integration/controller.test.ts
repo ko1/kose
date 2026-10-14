@@ -215,6 +215,23 @@ describe('KoseController', () => {
     expect(snap().displayed?.factCheck).toBeDefined();
   });
 
+  it('自由入力の事実確認は校正せずにレビューを作り、その後の kose は同じレビューで校正する', async () => {
+    const provider = new FactCheckingProvider();
+    const { snap, controller } = await setup({ provider });
+    controller.setScratchDraft('東京タワーは1950年完成');
+    void controller.factCheckScratch();
+    await flush();
+    expect(snap().displayedTabId).toBe(SCRATCH_TAB_ID);
+    expect(snap().displayed?.sourceText).toBe('東京タワーは1950年完成');
+    expect(provider.calls).toHaveLength(0);
+    provider.factCheckCalls[0].resolve(factResult);
+    await flush();
+    void controller.runScratch();
+    await flush();
+    expect(provider.calls).toHaveLength(1);
+    expect(snap().displayed?.factCheck).toBeDefined();
+  });
+
   it('長い文章でも、設定でオフにしたときや事実確認できないプロバイダーではすぐ校正する', async () => {
     await saveSettings({ longTextChars: 10 });
     const plain = await setup();
